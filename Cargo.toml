@@ -6,7 +6,7 @@ description = "A jq implementation in Rust"
 license = "MIT"
 keywords = ["jq", "json", "cli", "parser"]
 categories = ["command-line-utilities", "parsing"]
-repository = "https://github.com/user/jqr"
+repository = "https://github.com/EvanL1/jqr"
 
 [dependencies]
 nom = "8.0"
