@@ -11,7 +11,7 @@
 //! let filter = ".name";
 //!
 //! let results = run(filter, input).unwrap();
-//! assert_eq!(results, vec![Value::String("Alice".to_string())]);
+//! assert_eq!(results, vec![Value::string("Alice")]);
 //! ```
 
 pub mod ast;
@@ -72,7 +72,7 @@ mod tests {
     #[test]
     fn test_field_access() {
         let results = run(".name", r#"{"name": "Alice"}"#).unwrap();
-        assert_eq!(results, vec![Value::String("Alice".to_string())]);
+        assert_eq!(results, vec![Value::string("Alice")]);
     }
 
     #[test]
@@ -84,7 +84,7 @@ mod tests {
     #[test]
     fn test_pipe() {
         let results = run(".users | .[0] | .name", r#"{"users": [{"name": "Alice"}]}"#).unwrap();
-        assert_eq!(results, vec![Value::String("Alice".to_string())]);
+        assert_eq!(results, vec![Value::string("Alice")]);
     }
 
     #[test]
@@ -152,7 +152,7 @@ mod tests {
     #[test]
     fn test_if_then_else() {
         let results = run("if . > 5 then \"big\" else \"small\" end", "10").unwrap();
-        assert_eq!(results, vec![Value::String("big".to_string())]);
+        assert_eq!(results, vec![Value::string("big")]);
     }
 
     #[test]
@@ -176,7 +176,7 @@ mod tests {
     #[test]
     fn test_type() {
         let results = run("type", r#"{"a": 1}"#).unwrap();
-        assert_eq!(results, vec![Value::String("object".to_string())]);
+        assert_eq!(results, vec![Value::string("object")]);
     }
 
     #[test]
@@ -244,7 +244,7 @@ mod tests {
     #[test]
     fn test_join() {
         let results = run(r#"join("-")"#, r#"["a", "b", "c"]"#).unwrap();
-        assert_eq!(results, vec![Value::String("a-b-c".to_string())]);
+        assert_eq!(results, vec![Value::string("a-b-c")]);
     }
 
     #[test]
@@ -257,7 +257,7 @@ mod tests {
     #[test]
     fn test_alternative() {
         let results = run(".foo // \"default\"", r#"{"bar": 1}"#).unwrap();
-        assert_eq!(results, vec![Value::String("default".to_string())]);
+        assert_eq!(results, vec![Value::string("default")]);
     }
 
     #[test]
@@ -306,7 +306,7 @@ mod tests {
         assert_eq!(results.len(), 1);
         match &results[0] {
             Value::Object(obj) => {
-                assert_eq!(obj.get("string"), Some(&Value::String("hello".to_string())));
+                assert_eq!(obj.get("string"), Some(&Value::string("hello")));
                 assert_eq!(obj.get("offset"), Some(&Value::Number(Number::Int(0))));
             }
             _ => panic!("Expected object"),
@@ -316,22 +316,22 @@ mod tests {
     #[test]
     fn test_regex_sub() {
         let results = run(r#"sub("world"; "jq")"#, r#""hello world""#).unwrap();
-        assert_eq!(results, vec![Value::String("hello jq".to_string())]);
+        assert_eq!(results, vec![Value::string("hello jq")]);
     }
 
     #[test]
     fn test_regex_gsub() {
         let results = run(r#"gsub("o"; "0")"#, r#""hello world""#).unwrap();
-        assert_eq!(results, vec![Value::String("hell0 w0rld".to_string())]);
+        assert_eq!(results, vec![Value::string("hell0 w0rld")]);
     }
 
     #[test]
     fn test_regex_scan() {
         let results = run(r#"scan("\\w+")"#, r#""a b c""#).unwrap();
         assert_eq!(results.len(), 3);
-        assert_eq!(results[0], Value::String("a".to_string()));
-        assert_eq!(results[1], Value::String("b".to_string()));
-        assert_eq!(results[2], Value::String("c".to_string()));
+        assert_eq!(results[0], Value::string("a"));
+        assert_eq!(results[1], Value::string("b"));
+        assert_eq!(results[2], Value::string("c"));
     }
 
     #[test]
@@ -340,7 +340,7 @@ mod tests {
         assert_eq!(results.len(), 1);
         match &results[0] {
             Value::Object(obj) => {
-                assert_eq!(obj.get("name"), Some(&Value::String("hello".to_string())));
+                assert_eq!(obj.get("name"), Some(&Value::string("hello")));
             }
             _ => panic!("Expected object"),
         }

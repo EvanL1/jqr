@@ -1,22 +1,23 @@
-//! JSON Value type for jq
+//! JSON Value type for jq - using Rc for zero-copy sharing
 
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
 use std::fmt;
+use std::rc::Rc;
 
 use crate::error::{JqError, Result};
 
 /// Represents a JSON value in jq
-#[derive(Clone, Debug, Serialize, Deserialize)]
-#[serde(untagged)]
+/// Uses Rc for String/Array/Object to enable O(1) cloning
+#[derive(Clone, Debug)]
 pub enum Value {
     Null,
     Bool(bool),
     Number(Number),
-    String(String),
-    Array(Vec<Value>),
-    Object(IndexMap<String, Value>),
+    String(Rc<String>),
+    Array(Rc<Vec<Value>>),
+    Object(Rc<IndexMap<String, Value>>),
 }
 
 /// Number type supporting both integers and floats
@@ -96,6 +97,19 @@ impl PartialOrd for Number {
 }
 
 impl Value {
+    // Constructors for convenience
+    pub fn string(s: impl Into<String>) -> Self {
+        Value::String(Rc::new(s.into()))
+    }
+
+    pub fn array(items: Vec<Value>) -> Self {
+        Value::Array(Rc::new(items))
+    }
+
+    pub fn object(map: IndexMap<String, Value>) -> Self {
+        Value::Object(Rc::new(map))
+    }
+
     /// Get the type name of this value
     pub fn type_name(&self) -> &'static str {
         match self {
@@ -135,7 +149,7 @@ impl Value {
     /// Get keys of object
     pub fn keys(&self) -> Result<Vec<Value>> {
         match self {
-            Value::Object(obj) => Ok(obj.keys().cloned().map(Value::String).collect()),
+            Value::Object(obj) => Ok(obj.keys().map(|k| Value::string(k.clone())).collect()),
             Value::Array(arr) => Ok((0..arr.len() as i64).map(|i| Value::Number(Number::Int(i))).collect()),
             _ => Err(JqError::Type(format!(
                 "{} has no keys",
@@ -148,7 +162,7 @@ impl Value {
     pub fn values(&self) -> Result<Vec<Value>> {
         match self {
             Value::Object(obj) => Ok(obj.values().cloned().collect()),
-            Value::Array(arr) => Ok(arr.clone()),
+            Value::Array(arr) => Ok(arr.iter().cloned().collect()),
             _ => Err(JqError::Type(format!(
                 "{} has no values",
                 self.type_name()
@@ -172,7 +186,7 @@ impl Value {
                 }
             }
             (Value::Object(obj), Value::String(key)) => {
-                Ok(obj.get(key).cloned().unwrap_or(Value::Null))
+                Ok(obj.get(key.as_str()).cloned().unwrap_or(Value::Null))
             }
             (Value::Null, _) => Ok(Value::Null),
             _ => Err(JqError::InvalidIndex {
@@ -185,7 +199,7 @@ impl Value {
     /// Iterate over value
     pub fn iter(&self) -> Result<Vec<Value>> {
         match self {
-            Value::Array(arr) => Ok(arr.clone()),
+            Value::Array(arr) => Ok(arr.iter().cloned().collect()),
             Value::Object(obj) => Ok(obj.values().cloned().collect()),
             Value::Null => Ok(vec![]),
             _ => Err(JqError::NotIterable(self.type_name().to_string())),
@@ -204,12 +218,12 @@ impl Value {
                     Value::Number(Number::Float(n.as_f64().unwrap_or(0.0)))
                 }
             }
-            serde_json::Value::String(s) => Value::String(s),
+            serde_json::Value::String(s) => Value::string(s),
             serde_json::Value::Array(arr) => {
-                Value::Array(arr.into_iter().map(Value::from_json).collect())
+                Value::array(arr.into_iter().map(Value::from_json).collect())
             }
             serde_json::Value::Object(obj) => {
-                Value::Object(obj.into_iter().map(|(k, v)| (k, Value::from_json(v))).collect())
+                Value::object(obj.into_iter().map(|(k, v)| (k, Value::from_json(v))).collect())
             }
         }
     }
@@ -227,7 +241,7 @@ impl Value {
                         .unwrap_or(serde_json::Value::Null)
                 }
             },
-            Value::String(s) => serde_json::Value::String(s.clone()),
+            Value::String(s) => serde_json::Value::String((**s).clone()),
             Value::Array(arr) => {
                 serde_json::Value::Array(arr.iter().map(|v| v.to_json()).collect())
             }
@@ -236,6 +250,30 @@ impl Value {
                     obj.iter().map(|(k, v)| (k.clone(), v.to_json())).collect()
                 )
             }
+        }
+    }
+
+    /// Get inner string reference
+    pub fn as_str(&self) -> Option<&str> {
+        match self {
+            Value::String(s) => Some(s.as_str()),
+            _ => None,
+        }
+    }
+
+    /// Get inner array reference
+    pub fn as_array(&self) -> Option<&Vec<Value>> {
+        match self {
+            Value::Array(arr) => Some(arr.as_ref()),
+            _ => None,
+        }
+    }
+
+    /// Get inner object reference
+    pub fn as_object(&self) -> Option<&IndexMap<String, Value>> {
+        match self {
+            Value::Object(obj) => Some(obj.as_ref()),
+            _ => None,
         }
     }
 }
@@ -287,7 +325,7 @@ impl fmt::Display for Value {
                 Number::Int(i) => write!(f, "{}", i),
                 Number::Float(fl) => write!(f, "{}", fl),
             },
-            Value::String(s) => write!(f, "{:?}", s),
+            Value::String(s) => write!(f, "{:?}", &**s),
             Value::Array(_) | Value::Object(_) => {
                 write!(f, "{}", serde_json::to_string(&self.to_json()).unwrap_or_default())
             }
@@ -315,18 +353,38 @@ impl From<bool> for Value {
 
 impl From<String> for Value {
     fn from(s: String) -> Self {
-        Value::String(s)
+        Value::string(s)
     }
 }
 
 impl From<&str> for Value {
     fn from(s: &str) -> Self {
-        Value::String(s.to_string())
+        Value::string(s)
     }
 }
 
 impl<T: Into<Value>> From<Vec<T>> for Value {
     fn from(v: Vec<T>) -> Self {
-        Value::Array(v.into_iter().map(Into::into).collect())
+        Value::array(v.into_iter().map(Into::into).collect())
+    }
+}
+
+// Serde support - manual implementation since we use Rc
+impl Serialize for Value {
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        self.to_json().serialize(serializer)
+    }
+}
+
+impl<'de> Deserialize<'de> for Value {
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let json = serde_json::Value::deserialize(deserializer)?;
+        Ok(Value::from_json(json))
     }
 }

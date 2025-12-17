@@ -339,7 +339,7 @@ impl Parser {
             Some(Token::String(s)) => {
                 self.advance();
                 // TODO: Handle string interpolation
-                Ok(Expr::Literal(Value::String(s)))
+                Ok(Expr::Literal(Value::string(s)))
             }
 
             // Variable
