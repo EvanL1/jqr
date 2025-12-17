@@ -31,8 +31,8 @@ pub use value::{Number, Value};
 /// Run a jq filter on JSON input
 pub fn run(filter: &str, input: &str) -> Result<Vec<Value>> {
     let expr = parse(filter)?;
-    let json: serde_json::Value = serde_json::from_str(input)
-        .map_err(|e| JqError::Parse(format!("Invalid JSON: {}", e)))?;
+    let json: serde_json::Value =
+        serde_json::from_str(input).map_err(|e| JqError::Parse(format!("Invalid JSON: {}", e)))?;
     let input_value = Value::from_json(json);
     let ctx = Context::new();
     interpreter::eval(&expr, &ctx, input_value)

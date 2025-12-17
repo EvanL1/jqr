@@ -139,10 +139,7 @@ impl Value {
             Value::String(s) => Ok(s.chars().count()),
             Value::Array(arr) => Ok(arr.len()),
             Value::Object(obj) => Ok(obj.len()),
-            _ => Err(JqError::Type(format!(
-                "{} has no length",
-                self.type_name()
-            ))),
+            _ => Err(JqError::Type(format!("{} has no length", self.type_name()))),
         }
     }
 
@@ -150,11 +147,10 @@ impl Value {
     pub fn keys(&self) -> Result<Vec<Value>> {
         match self {
             Value::Object(obj) => Ok(obj.keys().map(|k| Value::string(k.clone())).collect()),
-            Value::Array(arr) => Ok((0..arr.len() as i64).map(|i| Value::Number(Number::Int(i))).collect()),
-            _ => Err(JqError::Type(format!(
-                "{} has no keys",
-                self.type_name()
-            ))),
+            Value::Array(arr) => Ok((0..arr.len() as i64)
+                .map(|i| Value::Number(Number::Int(i)))
+                .collect()),
+            _ => Err(JqError::Type(format!("{} has no keys", self.type_name()))),
         }
     }
 
@@ -163,10 +159,7 @@ impl Value {
         match self {
             Value::Object(obj) => Ok(obj.values().cloned().collect()),
             Value::Array(arr) => Ok(arr.iter().cloned().collect()),
-            _ => Err(JqError::Type(format!(
-                "{} has no values",
-                self.type_name()
-            ))),
+            _ => Err(JqError::Type(format!("{} has no values", self.type_name()))),
         }
     }
 
@@ -174,9 +167,9 @@ impl Value {
     pub fn index(&self, idx: &Value) -> Result<Value> {
         match (self, idx) {
             (Value::Array(arr), Value::Number(n)) => {
-                let i = n.as_i64().ok_or_else(|| {
-                    JqError::Type("array index must be integer".to_string())
-                })?;
+                let i = n
+                    .as_i64()
+                    .ok_or_else(|| JqError::Type("array index must be integer".to_string()))?;
                 let len = arr.len() as i64;
                 let actual_idx = if i < 0 { len + i } else { i };
                 if actual_idx < 0 || actual_idx >= len {
@@ -222,9 +215,11 @@ impl Value {
             serde_json::Value::Array(arr) => {
                 Value::array(arr.into_iter().map(Value::from_json).collect())
             }
-            serde_json::Value::Object(obj) => {
-                Value::object(obj.into_iter().map(|(k, v)| (k, Value::from_json(v))).collect())
-            }
+            serde_json::Value::Object(obj) => Value::object(
+                obj.into_iter()
+                    .map(|(k, v)| (k, Value::from_json(v)))
+                    .collect(),
+            ),
         }
     }
 
@@ -235,21 +230,17 @@ impl Value {
             Value::Bool(b) => serde_json::Value::Bool(*b),
             Value::Number(n) => match n {
                 Number::Int(i) => serde_json::Value::Number((*i).into()),
-                Number::Float(f) => {
-                    serde_json::Number::from_f64(*f)
-                        .map(serde_json::Value::Number)
-                        .unwrap_or(serde_json::Value::Null)
-                }
+                Number::Float(f) => serde_json::Number::from_f64(*f)
+                    .map(serde_json::Value::Number)
+                    .unwrap_or(serde_json::Value::Null),
             },
             Value::String(s) => serde_json::Value::String((**s).clone()),
             Value::Array(arr) => {
                 serde_json::Value::Array(arr.iter().map(|v| v.to_json()).collect())
             }
-            Value::Object(obj) => {
-                serde_json::Value::Object(
-                    obj.iter().map(|(k, v)| (k.clone(), v.to_json())).collect()
-                )
-            }
+            Value::Object(obj) => serde_json::Value::Object(
+                obj.iter().map(|(k, v)| (k.clone(), v.to_json())).collect(),
+            ),
         }
     }
 
@@ -327,7 +318,11 @@ impl fmt::Display for Value {
             },
             Value::String(s) => write!(f, "{:?}", &**s),
             Value::Array(_) | Value::Object(_) => {
-                write!(f, "{}", serde_json::to_string(&self.to_json()).unwrap_or_default())
+                write!(
+                    f,
+                    "{}",
+                    serde_json::to_string(&self.to_json()).unwrap_or_default()
+                )
             }
         }
     }

@@ -19,15 +19,12 @@ pub const BUILTINS: &[&str] = &[
     "isarray",
     "isobject",
     "isboolean",
-
     // Length and size
     "length",
-
     // Keys and values
     "keys",
     "keys_unsorted",
     "values",
-
     // Array functions
     "first",
     "last",
@@ -43,14 +40,12 @@ pub const BUILTINS: &[&str] = &[
     "group_by",
     "nth",
     "range",
-
     // Object functions
     "has",
     "in",
     "to_entries",
     "from_entries",
     "with_entries",
-
     // String functions
     "tostring",
     "tonumber",
@@ -70,7 +65,6 @@ pub const BUILTINS: &[&str] = &[
     "scan",
     "sub",
     "gsub",
-
     // Math functions
     "floor",
     "ceil",
@@ -90,7 +84,6 @@ pub const BUILTINS: &[&str] = &[
     "asin",
     "acos",
     "atan",
-
     // Control flow
     "select",
     "map",
@@ -102,14 +95,12 @@ pub const BUILTINS: &[&str] = &[
     "empty",
     "error",
     "not",
-
     // Path functions
     "path",
     "getpath",
     "setpath",
     "delpaths",
     "leaf_paths",
-
     // Misc
     "env",
     "now",

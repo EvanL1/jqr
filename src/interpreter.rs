@@ -63,28 +63,20 @@ pub fn eval(expr: &Expr, ctx: &Context, input: Value) -> Result<Vec<Value>> {
 
         Expr::Literal(v) => Ok(vec![v.clone()]),
 
-        Expr::Field(name) => {
-            match &input {
-                Value::Object(obj) => {
-                    Ok(vec![obj.get(name).cloned().unwrap_or(Value::Null)])
-                }
-                Value::Null => Ok(vec![Value::Null]),
-                _ => Err(JqError::Type(format!(
-                    "Cannot index {} with string \"{}\"",
-                    input.type_name(),
-                    name
-                ))),
-            }
-        }
+        Expr::Field(name) => match &input {
+            Value::Object(obj) => Ok(vec![obj.get(name).cloned().unwrap_or(Value::Null)]),
+            Value::Null => Ok(vec![Value::Null]),
+            _ => Err(JqError::Type(format!(
+                "Cannot index {} with string \"{}\"",
+                input.type_name(),
+                name
+            ))),
+        },
 
-        Expr::OptionalField(name) => {
-            match &input {
-                Value::Object(obj) => {
-                    Ok(vec![obj.get(name).cloned().unwrap_or(Value::Null)])
-                }
-                _ => Ok(vec![]),
-            }
-        }
+        Expr::OptionalField(name) => match &input {
+            Value::Object(obj) => Ok(vec![obj.get(name).cloned().unwrap_or(Value::Null)]),
+            _ => Ok(vec![]),
+        },
 
         Expr::Index(idx_expr) => {
             let indices = eval(idx_expr, ctx, input.clone())?;
@@ -106,88 +98,97 @@ pub fn eval(expr: &Expr, ctx: &Context, input: Value) -> Result<Vec<Value>> {
             Ok(results)
         }
 
-        Expr::Slice { start, end } => {
-            match &input {
-                Value::Array(arr) => {
-                    let len = arr.len() as i64;
-                    let start_idx = if let Some(s) = start {
-                        let vals = eval(s, ctx, input.clone())?;
-                        match vals.first() {
-                            Some(Value::Number(n)) => {
-                                let i = n.as_i64().unwrap_or(0);
-                                if i < 0 { (len + i).max(0) as usize } else { i as usize }
+        Expr::Slice { start, end } => match &input {
+            Value::Array(arr) => {
+                let len = arr.len() as i64;
+                let start_idx = if let Some(s) = start {
+                    let vals = eval(s, ctx, input.clone())?;
+                    match vals.first() {
+                        Some(Value::Number(n)) => {
+                            let i = n.as_i64().unwrap_or(0);
+                            if i < 0 {
+                                (len + i).max(0) as usize
+                            } else {
+                                i as usize
                             }
-                            _ => 0,
                         }
-                    } else {
-                        0
-                    };
-                    let end_idx = if let Some(e) = end {
-                        let vals = eval(e, ctx, input.clone())?;
-                        match vals.first() {
-                            Some(Value::Number(n)) => {
-                                let i = n.as_i64().unwrap_or(len);
-                                if i < 0 { (len + i).max(0) as usize } else { (i as usize).min(arr.len()) }
-                            }
-                            _ => arr.len(),
-                        }
-                    } else {
-                        arr.len()
-                    };
-                    if start_idx >= arr.len() || start_idx >= end_idx {
-                        Ok(vec![Value::array(vec![])])
-                    } else {
-                        Ok(vec![Value::array(arr[start_idx..end_idx].to_vec())])
+                        _ => 0,
                     }
-                }
-                Value::String(s) => {
-                    let chars: Vec<char> = s.chars().collect();
-                    let len = chars.len() as i64;
-                    let start_idx = if let Some(st) = start {
-                        let vals = eval(st, ctx, input.clone())?;
-                        match vals.first() {
-                            Some(Value::Number(n)) => {
-                                let i = n.as_i64().unwrap_or(0);
-                                if i < 0 { (len + i).max(0) as usize } else { i as usize }
+                } else {
+                    0
+                };
+                let end_idx = if let Some(e) = end {
+                    let vals = eval(e, ctx, input.clone())?;
+                    match vals.first() {
+                        Some(Value::Number(n)) => {
+                            let i = n.as_i64().unwrap_or(len);
+                            if i < 0 {
+                                (len + i).max(0) as usize
+                            } else {
+                                (i as usize).min(arr.len())
                             }
-                            _ => 0,
                         }
-                    } else {
-                        0
-                    };
-                    let end_idx = if let Some(e) = end {
-                        let vals = eval(e, ctx, input.clone())?;
-                        match vals.first() {
-                            Some(Value::Number(n)) => {
-                                let i = n.as_i64().unwrap_or(len);
-                                if i < 0 { (len + i).max(0) as usize } else { (i as usize).min(chars.len()) }
-                            }
-                            _ => chars.len(),
-                        }
-                    } else {
-                        chars.len()
-                    };
-                    if start_idx >= chars.len() || start_idx >= end_idx {
-                        Ok(vec![Value::string("")])
-                    } else {
-                        Ok(vec![Value::string(chars[start_idx..end_idx].iter().collect::<String>())])
+                        _ => arr.len(),
                     }
+                } else {
+                    arr.len()
+                };
+                if start_idx >= arr.len() || start_idx >= end_idx {
+                    Ok(vec![Value::array(vec![])])
+                } else {
+                    Ok(vec![Value::array(arr[start_idx..end_idx].to_vec())])
                 }
-                Value::Null => Ok(vec![Value::Null]),
-                _ => Err(JqError::Type(format!(
-                    "Cannot slice {}",
-                    input.type_name()
-                ))),
             }
-        }
+            Value::String(s) => {
+                let chars: Vec<char> = s.chars().collect();
+                let len = chars.len() as i64;
+                let start_idx = if let Some(st) = start {
+                    let vals = eval(st, ctx, input.clone())?;
+                    match vals.first() {
+                        Some(Value::Number(n)) => {
+                            let i = n.as_i64().unwrap_or(0);
+                            if i < 0 {
+                                (len + i).max(0) as usize
+                            } else {
+                                i as usize
+                            }
+                        }
+                        _ => 0,
+                    }
+                } else {
+                    0
+                };
+                let end_idx = if let Some(e) = end {
+                    let vals = eval(e, ctx, input.clone())?;
+                    match vals.first() {
+                        Some(Value::Number(n)) => {
+                            let i = n.as_i64().unwrap_or(len);
+                            if i < 0 {
+                                (len + i).max(0) as usize
+                            } else {
+                                (i as usize).min(chars.len())
+                            }
+                        }
+                        _ => chars.len(),
+                    }
+                } else {
+                    chars.len()
+                };
+                if start_idx >= chars.len() || start_idx >= end_idx {
+                    Ok(vec![Value::string("")])
+                } else {
+                    Ok(vec![Value::string(
+                        chars[start_idx..end_idx].iter().collect::<String>(),
+                    )])
+                }
+            }
+            Value::Null => Ok(vec![Value::Null]),
+            _ => Err(JqError::Type(format!("Cannot slice {}", input.type_name()))),
+        },
 
-        Expr::Iterator => {
-            input.iter()
-        }
+        Expr::Iterator => input.iter(),
 
-        Expr::OptionalIterator => {
-            input.iter().or(Ok(vec![]))
-        }
+        Expr::OptionalIterator => input.iter().or(Ok(vec![])),
 
         Expr::Pipe(left, right) => {
             let left_results = eval(left, ctx, input)?;
@@ -204,15 +205,13 @@ pub fn eval(expr: &Expr, ctx: &Context, input: Value) -> Result<Vec<Value>> {
             Ok(results)
         }
 
-        Expr::Array(inner) => {
-            match inner {
-                Some(expr) => {
-                    let items = eval(expr, ctx, input)?;
-                    Ok(vec![Value::array(items)])
-                }
-                None => Ok(vec![Value::array(vec![])]),
+        Expr::Array(inner) => match inner {
+            Some(expr) => {
+                let items = eval(expr, ctx, input)?;
+                Ok(vec![Value::array(items)])
             }
-        }
+            None => Ok(vec![Value::array(vec![])]),
+        },
 
         Expr::Object(entries) => {
             let mut results = vec![IndexMap::new()];
@@ -224,15 +223,13 @@ pub fn eval(expr: &Expr, ctx: &Context, input: Value) -> Result<Vec<Value>> {
                             let keys = match key {
                                 ObjectKey::Literal(s) => vec![s.clone()],
                                 ObjectKey::Ident(s) => vec![s.clone()],
-                                ObjectKey::Computed(expr) => {
-                                    eval(expr, ctx, input.clone())?
-                                        .into_iter()
-                                        .filter_map(|v| match v {
-                                            Value::String(s) => Some((*s).clone()),
-                                            _ => None,
-                                        })
-                                        .collect()
-                                }
+                                ObjectKey::Computed(expr) => eval(expr, ctx, input.clone())?
+                                    .into_iter()
+                                    .filter_map(|v| match v {
+                                        Value::String(s) => Some((*s).clone()),
+                                        _ => None,
+                                    })
+                                    .collect(),
                             };
                             let values = eval(value, ctx, input.clone())?;
                             for k in &keys {
@@ -258,7 +255,7 @@ pub fn eval(expr: &Expr, ctx: &Context, input: Value) -> Result<Vec<Value>> {
                     }
                 }
                 results = if new_results.is_empty() {
-                    results.iter().map(|obj| obj.clone()).collect()
+                    results.to_vec()
                 } else {
                     new_results
                 };
@@ -280,12 +277,14 @@ pub fn eval(expr: &Expr, ctx: &Context, input: Value) -> Result<Vec<Value>> {
 
         Expr::UnaryOp(op, expr) => {
             let vals = eval(expr, ctx, input)?;
-            vals.into_iter()
-                .map(|v| eval_unaryop(op, &v))
-                .collect()
+            vals.into_iter().map(|v| eval_unaryop(op, &v)).collect()
         }
 
-        Expr::If { cond, then_branch, else_branch } => {
+        Expr::If {
+            cond,
+            then_branch,
+            else_branch,
+        } => {
             let cond_vals = eval(cond, ctx, input.clone())?;
             let mut results = Vec::new();
             for cv in cond_vals {
@@ -300,35 +299,46 @@ pub fn eval(expr: &Expr, ctx: &Context, input: Value) -> Result<Vec<Value>> {
             Ok(results)
         }
 
-        Expr::TryCatch { try_expr, catch_expr } => {
-            match eval(try_expr, ctx, input.clone()) {
-                Ok(vals) => Ok(vals),
-                Err(_) => {
-                    if let Some(catch) = catch_expr {
-                        eval(catch, ctx, input)
-                    } else {
-                        Ok(vec![])
-                    }
+        Expr::TryCatch {
+            try_expr,
+            catch_expr,
+        } => match eval(try_expr, ctx, input.clone()) {
+            Ok(vals) => Ok(vals),
+            Err(_) => {
+                if let Some(catch) = catch_expr {
+                    eval(catch, ctx, input)
+                } else {
+                    Ok(vec![])
                 }
             }
-        }
+        },
 
-        Expr::Reduce { expr, var, init, update } => {
+        Expr::Reduce {
+            expr,
+            var,
+            init,
+            update,
+        } => {
             let items = eval(expr, ctx, input.clone())?;
-            let mut acc = eval(init, ctx, input.clone())?.into_iter().next().unwrap_or(Value::Null);
+            let mut acc = eval(init, ctx, input.clone())?
+                .into_iter()
+                .next()
+                .unwrap_or(Value::Null);
             for item in items {
                 let new_ctx = ctx.with_var(var.clone(), item);
-                acc = eval(update, &new_ctx, acc)?.into_iter().next().unwrap_or(Value::Null);
+                acc = eval(update, &new_ctx, acc)?
+                    .into_iter()
+                    .next()
+                    .unwrap_or(Value::Null);
             }
             Ok(vec![acc])
         }
 
-        Expr::Var(name) => {
-            ctx.get_var(name)
-                .cloned()
-                .map(|v| vec![v])
-                .ok_or_else(|| JqError::UndefinedVariable(name.clone()))
-        }
+        Expr::Var(name) => ctx
+            .get_var(name)
+            .cloned()
+            .map(|v| vec![v])
+            .ok_or_else(|| JqError::UndefinedVariable(name.clone())),
 
         Expr::As { expr, var, body } => {
             let vals = eval(expr, ctx, input.clone())?;
@@ -340,9 +350,7 @@ pub fn eval(expr: &Expr, ctx: &Context, input: Value) -> Result<Vec<Value>> {
             Ok(results)
         }
 
-        Expr::FuncCall { name, args } => {
-            eval_builtin(name, args, ctx, input)
-        }
+        Expr::FuncCall { name, args } => eval_builtin(name, args, ctx, input),
 
         Expr::FuncDef { def, body } => {
             let mut new_ctx = ctx.clone();
@@ -350,11 +358,12 @@ pub fn eval(expr: &Expr, ctx: &Context, input: Value) -> Result<Vec<Value>> {
             eval(body, &new_ctx, input)
         }
 
-        Expr::Optional(expr) => {
-            eval(expr, ctx, input).or(Ok(vec![]))
-        }
+        Expr::Optional(expr) => eval(expr, ctx, input).or(Ok(vec![])),
 
-        _ => Err(JqError::Custom(format!("Unimplemented expression: {:?}", expr))),
+        _ => Err(JqError::Custom(format!(
+            "Unimplemented expression: {:?}",
+            expr
+        ))),
     }
 }
 
@@ -382,9 +391,7 @@ fn eval_binop(op: &BinOp, left: &Value, right: &Value) -> Result<Value> {
             (Value::Number(a), Value::Number(b)) => {
                 Ok(Value::Number(Number::Float(a.as_f64() + b.as_f64())))
             }
-            (Value::String(a), Value::String(b)) => {
-                Ok(Value::string(format!("{}{}", a, b)))
-            }
+            (Value::String(a), Value::String(b)) => Ok(Value::string(format!("{}{}", a, b))),
             (Value::Array(a), Value::Array(b)) => {
                 let mut result = (**a).clone();
                 result.extend(b.iter().cloned());
@@ -409,10 +416,7 @@ fn eval_binop(op: &BinOp, left: &Value, right: &Value) -> Result<Value> {
                 Ok(Value::Number(Number::Float(a.as_f64() - b.as_f64())))
             }
             (Value::Array(a), Value::Array(b)) => {
-                let result: Vec<Value> = a.iter()
-                    .filter(|x| !b.contains(x))
-                    .cloned()
-                    .collect();
+                let result: Vec<Value> = a.iter().filter(|x| !b.contains(x)).cloned().collect();
                 Ok(Value::array(result))
             }
             _ => Err(JqError::Type(format!(
@@ -435,9 +439,11 @@ fn eval_binop(op: &BinOp, left: &Value, right: &Value) -> Result<Value> {
                 for (k, v) in b.iter() {
                     if let Some(existing) = result.get(k) {
                         if let (Value::Object(ea), Value::Object(eb)) = (existing, v) {
-                            let merged = eval_binop(&BinOp::Mul,
+                            let merged = eval_binop(
+                                &BinOp::Mul,
                                 &Value::Object(ea.clone()),
-                                &Value::Object(eb.clone()))?;
+                                &Value::Object(eb.clone()),
+                            )?;
                             result.insert(k.clone(), merged);
                             continue;
                         }
@@ -462,7 +468,8 @@ fn eval_binop(op: &BinOp, left: &Value, right: &Value) -> Result<Value> {
                 }
             }
             (Value::String(s), Value::String(sep)) => {
-                let parts: Vec<Value> = s.split(&**sep)
+                let parts: Vec<Value> = s
+                    .split(&**sep)
                     .map(|p| Value::string(p.to_string()))
                     .collect();
                 Ok(Value::array(parts))
@@ -475,12 +482,12 @@ fn eval_binop(op: &BinOp, left: &Value, right: &Value) -> Result<Value> {
         },
         BinOp::Mod => match (left, right) {
             (Value::Number(a), Value::Number(b)) => {
-                let ai = a.as_i64().ok_or_else(|| {
-                    JqError::Type("Modulo requires integers".to_string())
-                })?;
-                let bi = b.as_i64().ok_or_else(|| {
-                    JqError::Type("Modulo requires integers".to_string())
-                })?;
+                let ai = a
+                    .as_i64()
+                    .ok_or_else(|| JqError::Type("Modulo requires integers".to_string()))?;
+                let bi = b
+                    .as_i64()
+                    .ok_or_else(|| JqError::Type("Modulo requires integers".to_string()))?;
                 if bi == 0 {
                     Err(JqError::DivisionByZero)
                 } else {
@@ -515,7 +522,10 @@ fn eval_unaryop(op: &UnaryOp, value: &Value) -> Result<Value> {
     match op {
         UnaryOp::Neg => match value {
             Value::Number(n) => Ok(Value::Number(Number::Float(-n.as_f64()))),
-            _ => Err(JqError::Type(format!("Cannot negate {}", value.type_name()))),
+            _ => Err(JqError::Type(format!(
+                "Cannot negate {}",
+                value.type_name()
+            ))),
         },
         UnaryOp::Not => Ok(Value::Bool(!value.is_truthy())),
     }
@@ -615,7 +625,9 @@ fn eval_builtin(name: &str, args: &[Expr], ctx: &Context, input: Value) -> Resul
             if args.is_empty() {
                 match &input {
                     Value::Array(arr) if !arr.is_empty() => Ok(vec![arr[0].clone()]),
-                    _ => Err(JqError::Type("Cannot get first of empty or non-array".to_string())),
+                    _ => Err(JqError::Type(
+                        "Cannot get first of empty or non-array".to_string(),
+                    )),
                 }
             } else {
                 let vals = eval(&args[0], ctx, input)?;
@@ -626,7 +638,9 @@ fn eval_builtin(name: &str, args: &[Expr], ctx: &Context, input: Value) -> Resul
             if args.is_empty() {
                 match &input {
                     Value::Array(arr) if !arr.is_empty() => Ok(vec![arr.last().unwrap().clone()]),
-                    _ => Err(JqError::Type("Cannot get last of empty or non-array".to_string())),
+                    _ => Err(JqError::Type(
+                        "Cannot get last of empty or non-array".to_string(),
+                    )),
                 }
             } else {
                 let vals = eval(&args[0], ctx, input)?;
@@ -639,7 +653,10 @@ fn eval_builtin(name: &str, args: &[Expr], ctx: &Context, input: Value) -> Resul
                 vec.reverse();
                 Ok(vec![Value::array(vec)])
             }
-            _ => Err(JqError::Type(format!("Cannot reverse {}", input.type_name()))),
+            _ => Err(JqError::Type(format!(
+                "Cannot reverse {}",
+                input.type_name()
+            ))),
         },
         "sort" => match input {
             Value::Array(arr) => {
@@ -659,7 +676,10 @@ fn eval_builtin(name: &str, args: &[Expr], ctx: &Context, input: Value) -> Resul
                 }
                 Ok(vec![Value::array(seen)])
             }
-            _ => Err(JqError::Type(format!("Cannot unique {}", input.type_name()))),
+            _ => Err(JqError::Type(format!(
+                "Cannot unique {}",
+                input.type_name()
+            ))),
         },
         "flatten" => {
             fn flatten_impl(arr: &[Value], depth: i64) -> Vec<Value> {
@@ -689,15 +709,18 @@ fn eval_builtin(name: &str, args: &[Expr], ctx: &Context, input: Value) -> Resul
                     };
                     Ok(vec![Value::array(flatten_impl(&arr, depth))])
                 }
-                _ => Err(JqError::Type(format!("Cannot flatten {}", input.type_name()))),
+                _ => Err(JqError::Type(format!(
+                    "Cannot flatten {}",
+                    input.type_name()
+                ))),
             }
         }
         "add" => match input {
             Value::Array(arr) if arr.is_empty() => Ok(vec![Value::Null]),
             Value::Array(arr) => {
                 let mut result = arr[0].clone();
-                for item in arr.iter().cloned().skip(1) {
-                    result = eval_binop(&BinOp::Add, &result, &item)?;
+                for item in arr.iter().skip(1) {
+                    result = eval_binop(&BinOp::Add, &result, item)?;
                 }
                 Ok(vec![result])
             }
@@ -706,22 +729,32 @@ fn eval_builtin(name: &str, args: &[Expr], ctx: &Context, input: Value) -> Resul
         "min" => match input {
             Value::Array(arr) if arr.is_empty() => Ok(vec![Value::Null]),
             Value::Array(arr) => {
-                let min = arr.iter().cloned()
+                let min = arr
+                    .iter()
+                    .cloned()
                     .min_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
                     .unwrap();
                 Ok(vec![min])
             }
-            _ => Err(JqError::Type(format!("Cannot get min of {}", input.type_name()))),
+            _ => Err(JqError::Type(format!(
+                "Cannot get min of {}",
+                input.type_name()
+            ))),
         },
         "max" => match input {
             Value::Array(arr) if arr.is_empty() => Ok(vec![Value::Null]),
             Value::Array(arr) => {
-                let max = arr.iter().cloned()
+                let max = arr
+                    .iter()
+                    .cloned()
                     .max_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
                     .unwrap();
                 Ok(vec![max])
             }
-            _ => Err(JqError::Type(format!("Cannot get max of {}", input.type_name()))),
+            _ => Err(JqError::Type(format!(
+                "Cannot get max of {}",
+                input.type_name()
+            ))),
         },
 
         // Object functions
@@ -765,7 +798,8 @@ fn eval_builtin(name: &str, args: &[Expr], ctx: &Context, input: Value) -> Resul
         }
         "to_entries" => match input {
             Value::Object(obj) => {
-                let entries: Vec<Value> = obj.iter()
+                let entries: Vec<Value> = obj
+                    .iter()
                     .map(|(k, v)| {
                         let mut entry = IndexMap::new();
                         entry.insert("key".to_string(), Value::string(k.clone()));
@@ -775,15 +809,25 @@ fn eval_builtin(name: &str, args: &[Expr], ctx: &Context, input: Value) -> Resul
                     .collect();
                 Ok(vec![Value::array(entries)])
             }
-            _ => Err(JqError::Type(format!("Cannot convert {} to entries", input.type_name()))),
+            _ => Err(JqError::Type(format!(
+                "Cannot convert {} to entries",
+                input.type_name()
+            ))),
         },
         "from_entries" => match input {
             Value::Array(arr) => {
                 let mut obj = IndexMap::new();
                 for entry in arr.iter() {
                     if let Value::Object(e) = entry {
-                        let key = e.get("key").or_else(|| e.get("k")).or_else(|| e.get("name"));
-                        let value = e.get("value").or_else(|| e.get("v")).cloned().unwrap_or(Value::Null);
+                        let key = e
+                            .get("key")
+                            .or_else(|| e.get("k"))
+                            .or_else(|| e.get("name"));
+                        let value = e
+                            .get("value")
+                            .or_else(|| e.get("v"))
+                            .cloned()
+                            .unwrap_or(Value::Null);
                         if let Some(Value::String(k)) = key {
                             obj.insert((**k).clone(), value);
                         }
@@ -791,7 +835,10 @@ fn eval_builtin(name: &str, args: &[Expr], ctx: &Context, input: Value) -> Resul
                 }
                 Ok(vec![Value::object(obj)])
             }
-            _ => Err(JqError::Type(format!("Cannot convert {} from entries", input.type_name()))),
+            _ => Err(JqError::Type(format!(
+                "Cannot convert {} from entries",
+                input.type_name()
+            ))),
         },
 
         // String functions
@@ -816,15 +863,24 @@ fn eval_builtin(name: &str, args: &[Expr], ctx: &Context, input: Value) -> Resul
                     Err(JqError::Type(format!("Cannot parse \"{}\" as number", s)))
                 }
             }
-            _ => Err(JqError::Type(format!("Cannot convert {} to number", input.type_name()))),
+            _ => Err(JqError::Type(format!(
+                "Cannot convert {} to number",
+                input.type_name()
+            ))),
         },
         "ascii_downcase" => match input {
             Value::String(s) => Ok(vec![Value::string(s.to_lowercase())]),
-            _ => Err(JqError::Type(format!("Cannot lowercase {}", input.type_name()))),
+            _ => Err(JqError::Type(format!(
+                "Cannot lowercase {}",
+                input.type_name()
+            ))),
         },
         "ascii_upcase" => match input {
             Value::String(s) => Ok(vec![Value::string(s.to_uppercase())]),
-            _ => Err(JqError::Type(format!("Cannot uppercase {}", input.type_name()))),
+            _ => Err(JqError::Type(format!(
+                "Cannot uppercase {}",
+                input.type_name()
+            ))),
         },
         "ltrimstr" => {
             if args.is_empty() {
@@ -836,7 +892,7 @@ fn eval_builtin(name: &str, args: &[Expr], ctx: &Context, input: Value) -> Resul
                 match (&input, &prefix) {
                     (Value::String(s), Value::String(p)) => {
                         results.push(Value::string(
-                            s.strip_prefix(p.as_str()).unwrap_or(s).to_string()
+                            s.strip_prefix(p.as_str()).unwrap_or(s).to_string(),
                         ));
                     }
                     _ => results.push(input.clone()),
@@ -854,7 +910,7 @@ fn eval_builtin(name: &str, args: &[Expr], ctx: &Context, input: Value) -> Resul
                 match (&input, &suffix) {
                     (Value::String(s), Value::String(p)) => {
                         results.push(Value::string(
-                            s.strip_suffix(p.as_str()).unwrap_or(s).to_string()
+                            s.strip_suffix(p.as_str()).unwrap_or(s).to_string(),
                         ));
                     }
                     _ => results.push(input.clone()),
@@ -871,7 +927,8 @@ fn eval_builtin(name: &str, args: &[Expr], ctx: &Context, input: Value) -> Resul
             for sep in seps {
                 match (&input, &sep) {
                     (Value::String(s), Value::String(sep)) => {
-                        let parts: Vec<Value> = s.split(sep.as_str())
+                        let parts: Vec<Value> = s
+                            .split(sep.as_str())
                             .map(|p| Value::string(p.to_string()))
                             .collect();
                         results.push(Value::array(parts));
@@ -890,7 +947,8 @@ fn eval_builtin(name: &str, args: &[Expr], ctx: &Context, input: Value) -> Resul
             for sep in seps {
                 match (&input, &sep) {
                     (Value::Array(arr), Value::String(sep)) => {
-                        let parts: Vec<String> = arr.iter()
+                        let parts: Vec<String> = arr
+                            .iter()
                             .filter_map(|v| match v {
                                 Value::String(s) => Some((**s).clone()),
                                 Value::Null => Some(String::new()),
@@ -928,7 +986,9 @@ fn eval_builtin(name: &str, args: &[Expr], ctx: &Context, input: Value) -> Resul
         }
         "startswith" => {
             if args.is_empty() {
-                return Err(JqError::Custom("startswith requires 1 argument".to_string()));
+                return Err(JqError::Custom(
+                    "startswith requires 1 argument".to_string(),
+                ));
             }
             let prefixes = eval(&args[0], ctx, input.clone())?;
             let mut results = Vec::new();
@@ -980,12 +1040,17 @@ fn eval_builtin(name: &str, args: &[Expr], ctx: &Context, input: Value) -> Resul
             for pattern in patterns {
                 match (&input, &pattern) {
                     (Value::String(s), Value::String(p)) => {
-                        let regex_pattern = build_regex_pattern(&p, flags.as_deref().map(|s| s.as_str()))?;
+                        let regex_pattern =
+                            build_regex_pattern(p, flags.as_deref().map(|s| s.as_str()))?;
                         let re = Regex::new(&regex_pattern)
                             .map_err(|e| JqError::Custom(format!("Invalid regex: {}", e)))?;
                         results.push(Value::Bool(re.is_match(s)));
                     }
-                    _ => return Err(JqError::Type("test requires string and pattern".to_string())),
+                    _ => {
+                        return Err(JqError::Type(
+                            "test requires string and pattern".to_string(),
+                        ))
+                    }
                 }
             }
             Ok(results)
@@ -1011,7 +1076,8 @@ fn eval_builtin(name: &str, args: &[Expr], ctx: &Context, input: Value) -> Resul
             for pattern in patterns {
                 match (&input, &pattern) {
                     (Value::String(s), Value::String(p)) => {
-                        let regex_pattern = build_regex_pattern(&p, flags.as_deref().map(|s| s.as_str()))?;
+                        let regex_pattern =
+                            build_regex_pattern(p, flags.as_deref().map(|s| s.as_str()))?;
                         let re = Regex::new(&regex_pattern)
                             .map_err(|e| JqError::Custom(format!("Invalid regex: {}", e)))?;
 
@@ -1023,7 +1089,11 @@ fn eval_builtin(name: &str, args: &[Expr], ctx: &Context, input: Value) -> Resul
                             results.push(build_match_object(&cap, s));
                         }
                     }
-                    _ => return Err(JqError::Type("match requires string and pattern".to_string())),
+                    _ => {
+                        return Err(JqError::Type(
+                            "match requires string and pattern".to_string(),
+                        ))
+                    }
                 }
             }
             Ok(results)
@@ -1048,7 +1118,8 @@ fn eval_builtin(name: &str, args: &[Expr], ctx: &Context, input: Value) -> Resul
             for pattern in patterns {
                 match (&input, &pattern) {
                     (Value::String(s), Value::String(p)) => {
-                        let regex_pattern = build_regex_pattern(&p, flags.as_deref().map(|s| s.as_str()))?;
+                        let regex_pattern =
+                            build_regex_pattern(p, flags.as_deref().map(|s| s.as_str()))?;
                         let re = Regex::new(&regex_pattern)
                             .map_err(|e| JqError::Custom(format!("Invalid regex: {}", e)))?;
 
@@ -1062,7 +1133,11 @@ fn eval_builtin(name: &str, args: &[Expr], ctx: &Context, input: Value) -> Resul
                             results.push(Value::object(obj));
                         }
                     }
-                    _ => return Err(JqError::Type("capture requires string and pattern".to_string())),
+                    _ => {
+                        return Err(JqError::Type(
+                            "capture requires string and pattern".to_string(),
+                        ))
+                    }
                 }
             }
             Ok(results)
@@ -1087,14 +1162,19 @@ fn eval_builtin(name: &str, args: &[Expr], ctx: &Context, input: Value) -> Resul
             for pattern in patterns {
                 match (&input, &pattern) {
                     (Value::String(s), Value::String(p)) => {
-                        let regex_pattern = build_regex_pattern(&p, flags.as_deref().map(|s| s.as_str()))?;
+                        let regex_pattern =
+                            build_regex_pattern(p, flags.as_deref().map(|s| s.as_str()))?;
                         let re = Regex::new(&regex_pattern)
                             .map_err(|e| JqError::Custom(format!("Invalid regex: {}", e)))?;
                         for part in re.split(s) {
                             results.push(Value::string(part.to_string()));
                         }
                     }
-                    _ => return Err(JqError::Type("splits requires string and pattern".to_string())),
+                    _ => {
+                        return Err(JqError::Type(
+                            "splits requires string and pattern".to_string(),
+                        ))
+                    }
                 }
             }
             Ok(results)
@@ -1121,7 +1201,8 @@ fn eval_builtin(name: &str, args: &[Expr], ctx: &Context, input: Value) -> Resul
                 for replacement in &replacements {
                     match (&input, pattern, replacement) {
                         (Value::String(s), Value::String(p), Value::String(r)) => {
-                            let regex_pattern = build_regex_pattern(p, flags.as_deref().map(|s| s.as_str()))?;
+                            let regex_pattern =
+                                build_regex_pattern(p, flags.as_deref().map(|s| s.as_str()))?;
                             let re = Regex::new(&regex_pattern)
                                 .map_err(|e| JqError::Custom(format!("Invalid regex: {}", e)))?;
                             // Convert jq replacement syntax to regex replacement syntax
@@ -1157,7 +1238,8 @@ fn eval_builtin(name: &str, args: &[Expr], ctx: &Context, input: Value) -> Resul
                 for replacement in &replacements {
                     match (&input, pattern, replacement) {
                         (Value::String(s), Value::String(p), Value::String(r)) => {
-                            let regex_pattern = build_regex_pattern(p, flags.as_deref().map(|s| s.as_str()))?;
+                            let regex_pattern =
+                                build_regex_pattern(p, flags.as_deref().map(|s| s.as_str()))?;
                             let re = Regex::new(&regex_pattern)
                                 .map_err(|e| JqError::Custom(format!("Invalid regex: {}", e)))?;
                             // Convert jq replacement syntax to regex replacement syntax
@@ -1191,18 +1273,19 @@ fn eval_builtin(name: &str, args: &[Expr], ctx: &Context, input: Value) -> Resul
             for pattern in patterns {
                 match (&input, &pattern) {
                     (Value::String(s), Value::String(p)) => {
-                        let regex_pattern = build_regex_pattern(&p, flags.as_deref().map(|s| s.as_str()))?;
+                        let regex_pattern =
+                            build_regex_pattern(p, flags.as_deref().map(|s| s.as_str()))?;
                         let re = Regex::new(&regex_pattern)
                             .map_err(|e| JqError::Custom(format!("Invalid regex: {}", e)))?;
 
                         for cap in re.captures_iter(s) {
                             if cap.len() > 1 {
                                 // Has capture groups - return array of captured strings
-                                let captures: Vec<Value> = cap.iter()
+                                let captures: Vec<Value> = cap
+                                    .iter()
                                     .skip(1) // Skip the full match
                                     .map(|m| {
-                                        m.map(|m| Value::string(m.as_str()))
-                                            .unwrap_or(Value::Null)
+                                        m.map(|m| Value::string(m.as_str())).unwrap_or(Value::Null)
                                     })
                                     .collect();
                                 results.push(Value::array(captures));
@@ -1212,7 +1295,11 @@ fn eval_builtin(name: &str, args: &[Expr], ctx: &Context, input: Value) -> Resul
                             }
                         }
                     }
-                    _ => return Err(JqError::Type("scan requires string and pattern".to_string())),
+                    _ => {
+                        return Err(JqError::Type(
+                            "scan requires string and pattern".to_string(),
+                        ))
+                    }
                 }
             }
             Ok(results)
@@ -1278,12 +1365,17 @@ fn eval_builtin(name: &str, args: &[Expr], ctx: &Context, input: Value) -> Resul
                     }
                     Ok(vec![Value::array(results)])
                 }
-                _ => Err(JqError::Type(format!("Cannot map over {}", input.type_name()))),
+                _ => Err(JqError::Type(format!(
+                    "Cannot map over {}",
+                    input.type_name()
+                ))),
             }
         }
         "map_values" => {
             if args.is_empty() {
-                return Err(JqError::Custom("map_values requires 1 argument".to_string()));
+                return Err(JqError::Custom(
+                    "map_values requires 1 argument".to_string(),
+                ));
             }
             match input {
                 Value::Array(arr) => {
@@ -1306,7 +1398,10 @@ fn eval_builtin(name: &str, args: &[Expr], ctx: &Context, input: Value) -> Resul
                     }
                     Ok(vec![Value::object(result)])
                 }
-                _ => Err(JqError::Type(format!("Cannot map_values over {}", input.type_name()))),
+                _ => Err(JqError::Type(format!(
+                    "Cannot map_values over {}",
+                    input.type_name()
+                ))),
             }
         }
         "group_by" => {
@@ -1322,12 +1417,13 @@ fn eval_builtin(name: &str, args: &[Expr], ctx: &Context, input: Value) -> Resul
                         let key_str = serde_json::to_string(&key.to_json()).unwrap_or_default();
                         groups.entry(key_str).or_default().push(item.clone());
                     }
-                    let result: Vec<Value> = groups.into_values()
-                        .map(Value::array)
-                        .collect();
+                    let result: Vec<Value> = groups.into_values().map(Value::array).collect();
                     Ok(vec![Value::array(result)])
                 }
-                _ => Err(JqError::Type(format!("Cannot group_by {}", input.type_name()))),
+                _ => Err(JqError::Type(format!(
+                    "Cannot group_by {}",
+                    input.type_name()
+                ))),
             }
         }
         "sort_by" => {
@@ -1338,7 +1434,8 @@ fn eval_builtin(name: &str, args: &[Expr], ctx: &Context, input: Value) -> Resul
                 Value::Array(arr) => {
                     let mut arr = (*arr).clone();
                     // Get sort keys for all items
-                    let mut keyed: Vec<(Value, Value)> = arr.drain(..)
+                    let mut keyed: Vec<(Value, Value)> = arr
+                        .drain(..)
                         .map(|item| {
                             let key = eval(&args[0], ctx, item.clone())
                                 .ok()
@@ -1350,9 +1447,14 @@ fn eval_builtin(name: &str, args: &[Expr], ctx: &Context, input: Value) -> Resul
                     keyed.sort_by(|(a, _), (b, _)| {
                         a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal)
                     });
-                    Ok(vec![Value::array(keyed.into_iter().map(|(_, v)| v).collect())])
+                    Ok(vec![Value::array(
+                        keyed.into_iter().map(|(_, v)| v).collect(),
+                    )])
                 }
-                _ => Err(JqError::Type(format!("Cannot sort_by {}", input.type_name()))),
+                _ => Err(JqError::Type(format!(
+                    "Cannot sort_by {}",
+                    input.type_name()
+                ))),
             }
         }
         "unique_by" => {
@@ -1375,48 +1477,54 @@ fn eval_builtin(name: &str, args: &[Expr], ctx: &Context, input: Value) -> Resul
                     }
                     Ok(vec![Value::array(result)])
                 }
-                _ => Err(JqError::Type(format!("Cannot unique_by {}", input.type_name()))),
+                _ => Err(JqError::Type(format!(
+                    "Cannot unique_by {}",
+                    input.type_name()
+                ))),
             }
         }
-        "any" => {
-            match input {
-                Value::Array(arr) => {
-                    if args.is_empty() {
-                        Ok(vec![Value::Bool(arr.iter().any(|v| v.is_truthy()))])
-                    } else {
-                        let result = arr.iter().cloned().any(|item| {
-                            eval(&args[0], ctx, item)
-                                .map(|vals| vals.iter().any(|v| v.is_truthy()))
-                                .unwrap_or(false)
-                        });
-                        Ok(vec![Value::Bool(result)])
-                    }
+        "any" => match input {
+            Value::Array(arr) => {
+                if args.is_empty() {
+                    Ok(vec![Value::Bool(arr.iter().any(|v| v.is_truthy()))])
+                } else {
+                    let result = arr.iter().cloned().any(|item| {
+                        eval(&args[0], ctx, item)
+                            .map(|vals| vals.iter().any(|v| v.is_truthy()))
+                            .unwrap_or(false)
+                    });
+                    Ok(vec![Value::Bool(result)])
                 }
-                _ => Err(JqError::Type(format!("Cannot any over {}", input.type_name()))),
             }
-        }
-        "all" => {
-            match input {
-                Value::Array(arr) => {
-                    if args.is_empty() {
-                        Ok(vec![Value::Bool(arr.iter().all(|v| v.is_truthy()))])
-                    } else {
-                        let result = arr.iter().cloned().all(|item| {
-                            eval(&args[0], ctx, item)
-                                .map(|vals| vals.iter().all(|v| v.is_truthy()))
-                                .unwrap_or(false)
-                        });
-                        Ok(vec![Value::Bool(result)])
-                    }
+            _ => Err(JqError::Type(format!(
+                "Cannot any over {}",
+                input.type_name()
+            ))),
+        },
+        "all" => match input {
+            Value::Array(arr) => {
+                if args.is_empty() {
+                    Ok(vec![Value::Bool(arr.iter().all(|v| v.is_truthy()))])
+                } else {
+                    let result = arr.iter().cloned().all(|item| {
+                        eval(&args[0], ctx, item)
+                            .map(|vals| vals.iter().all(|v| v.is_truthy()))
+                            .unwrap_or(false)
+                    });
+                    Ok(vec![Value::Bool(result)])
                 }
-                _ => Err(JqError::Type(format!("Cannot all over {}", input.type_name()))),
             }
-        }
+            _ => Err(JqError::Type(format!(
+                "Cannot all over {}",
+                input.type_name()
+            ))),
+        },
         "range" => {
             let (from, to, step) = match args.len() {
                 1 => {
                     let to = eval(&args[0], ctx, input.clone())?
-                        .into_iter().next()
+                        .into_iter()
+                        .next()
                         .and_then(|v| match v {
                             Value::Number(n) => n.as_i64(),
                             _ => None,
@@ -1426,14 +1534,16 @@ fn eval_builtin(name: &str, args: &[Expr], ctx: &Context, input: Value) -> Resul
                 }
                 2 => {
                     let from = eval(&args[0], ctx, input.clone())?
-                        .into_iter().next()
+                        .into_iter()
+                        .next()
                         .and_then(|v| match v {
                             Value::Number(n) => n.as_i64(),
                             _ => None,
                         })
                         .unwrap_or(0);
                     let to = eval(&args[1], ctx, input.clone())?
-                        .into_iter().next()
+                        .into_iter()
+                        .next()
                         .and_then(|v| match v {
                             Value::Number(n) => n.as_i64(),
                             _ => None,
@@ -1443,21 +1553,24 @@ fn eval_builtin(name: &str, args: &[Expr], ctx: &Context, input: Value) -> Resul
                 }
                 _ => {
                     let from = eval(&args[0], ctx, input.clone())?
-                        .into_iter().next()
+                        .into_iter()
+                        .next()
                         .and_then(|v| match v {
                             Value::Number(n) => n.as_i64(),
                             _ => None,
                         })
                         .unwrap_or(0);
                     let to = eval(&args[1], ctx, input.clone())?
-                        .into_iter().next()
+                        .into_iter()
+                        .next()
                         .and_then(|v| match v {
                             Value::Number(n) => n.as_i64(),
                             _ => None,
                         })
                         .unwrap_or(0);
                     let step = eval(&args[2], ctx, input)?
-                        .into_iter().next()
+                        .into_iter()
+                        .next()
                         .and_then(|v| match v {
                             Value::Number(n) => n.as_i64(),
                             _ => None,
@@ -1486,10 +1599,13 @@ fn eval_builtin(name: &str, args: &[Expr], ctx: &Context, input: Value) -> Resul
         }
         "nth" => {
             if args.is_empty() {
-                return Err(JqError::Custom("nth requires at least 1 argument".to_string()));
+                return Err(JqError::Custom(
+                    "nth requires at least 1 argument".to_string(),
+                ));
             }
             let n = eval(&args[0], ctx, input.clone())?
-                .into_iter().next()
+                .into_iter()
+                .next()
                 .and_then(|v| match v {
                     Value::Number(num) => num.as_i64(),
                     _ => None,
@@ -1503,7 +1619,7 @@ fn eval_builtin(name: &str, args: &[Expr], ctx: &Context, input: Value) -> Resul
                 Ok(vals.into_iter().nth(n as usize).into_iter().collect())
             } else {
                 match input {
-                    Value::Array(arr) => Ok(arr.iter().cloned().nth(n as usize).into_iter().collect()),
+                    Value::Array(arr) => Ok(arr.get(n as usize).cloned().into_iter().collect()),
                     _ => Err(JqError::Type("nth requires array".to_string())),
                 }
             }
@@ -1543,9 +1659,7 @@ fn eval_builtin(name: &str, args: &[Expr], ctx: &Context, input: Value) -> Resul
             let duration = SystemTime::now()
                 .duration_since(UNIX_EPOCH)
                 .unwrap_or_default();
-            Ok(vec![Value::Number(Number::Float(
-                duration.as_secs_f64()
-            ))])
+            Ok(vec![Value::Number(Number::Float(duration.as_secs_f64()))])
         }
         "debug" => {
             eprintln!("[DEBUG] {}", input);
@@ -1558,7 +1672,9 @@ fn eval_builtin(name: &str, args: &[Expr], ctx: &Context, input: Value) -> Resul
                 if func.params.len() != args.len() {
                     return Err(JqError::Custom(format!(
                         "Function {} expects {} arguments, got {}",
-                        name, func.params.len(), args.len()
+                        name,
+                        func.params.len(),
+                        args.len()
                     )));
                 }
                 let mut new_ctx = ctx.clone();
@@ -1584,11 +1700,9 @@ fn value_contains(haystack: &Value, needle: &Value) -> bool {
         (Value::Array(h), Value::Array(n)) => {
             n.iter().all(|ni| h.iter().any(|hi| value_contains(hi, ni)))
         }
-        (Value::Object(h), Value::Object(n)) => {
-            n.iter().all(|(k, nv)| {
-                h.get(k).map(|hv| value_contains(hv, nv)).unwrap_or(false)
-            })
-        }
+        (Value::Object(h), Value::Object(n)) => n
+            .iter()
+            .all(|(k, nv)| h.get(k).map(|hv| value_contains(hv, nv)).unwrap_or(false)),
         (h, n) => h == n,
     }
 }
@@ -1620,23 +1734,35 @@ fn build_match_object(cap: &regex::Captures, _input: &str) -> Value {
     let mut obj = IndexMap::new();
 
     // offset - byte offset of the match
-    obj.insert("offset".to_string(), Value::Number(Number::Int(full_match.start() as i64)));
+    obj.insert(
+        "offset".to_string(),
+        Value::Number(Number::Int(full_match.start() as i64)),
+    );
     // length - length of the match
-    obj.insert("length".to_string(), Value::Number(Number::Int(full_match.len() as i64)));
+    obj.insert(
+        "length".to_string(),
+        Value::Number(Number::Int(full_match.len() as i64)),
+    );
     // string - the matched string
     obj.insert("string".to_string(), Value::string(full_match.as_str()));
     // name - the capture group name (null for unnamed)
     obj.insert("name".to_string(), Value::Null);
 
     // captures - array of capture groups
-    let captures: Vec<Value> = cap.iter()
+    let captures: Vec<Value> = cap
+        .iter()
         .skip(1) // Skip the full match
-        .enumerate()
-        .map(|(_i, m)| {
+        .map(|m| {
             let mut capture_obj = IndexMap::new();
             if let Some(m) = m {
-                capture_obj.insert("offset".to_string(), Value::Number(Number::Int(m.start() as i64)));
-                capture_obj.insert("length".to_string(), Value::Number(Number::Int(m.len() as i64)));
+                capture_obj.insert(
+                    "offset".to_string(),
+                    Value::Number(Number::Int(m.start() as i64)),
+                );
+                capture_obj.insert(
+                    "length".to_string(),
+                    Value::Number(Number::Int(m.len() as i64)),
+                );
                 capture_obj.insert("string".to_string(), Value::string(m.as_str()));
                 // Try to get named capture
                 capture_obj.insert("name".to_string(), Value::Null);
@@ -1689,9 +1815,8 @@ fn convert_jq_replacement(replacement: &str) -> String {
                         // Numbered group \(1) -> $1
                         result.push('$');
                         result.push_str(&content);
-                    } else if content.starts_with('.') {
+                    } else if let Some(name) = content.strip_prefix('.') {
                         // Named group \(.name) -> ${name}
-                        let name = &content[1..];
                         result.push_str("${");
                         result.push_str(name);
                         result.push('}');

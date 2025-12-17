@@ -3,9 +3,9 @@
 pub use crate::ast::*;
 
 use crate::error::{JqError, Result};
-use crate::value::{Number, Value};
 use crate::lexer::lex;
 use crate::token::Token;
+use crate::value::{Number, Value};
 
 /// Parse a jq program from a string
 pub fn parse(input: &str) -> Result<Expr> {
@@ -54,10 +54,6 @@ impl Parser {
                 expected
             ))),
         }
-    }
-
-    fn at_end(&self) -> bool {
-        self.pos >= self.tokens.len()
     }
 
     /// Parse a complete expression
@@ -232,10 +228,8 @@ impl Parser {
                             );
                         } else {
                             self.expect(&Token::RBracket)?;
-                            expr = Expr::Pipe(
-                                Box::new(expr),
-                                Box::new(Expr::Index(Box::new(index))),
-                            );
+                            expr =
+                                Expr::Pipe(Box::new(expr), Box::new(Expr::Index(Box::new(index))));
                         }
                     }
                 }
@@ -450,7 +444,11 @@ impl Parser {
                 self.advance();
                 let name = match self.advance() {
                     Some(Token::Ident(name)) => name,
-                    _ => return Err(JqError::Parse("Expected function name after 'def'".to_string())),
+                    _ => {
+                        return Err(JqError::Parse(
+                            "Expected function name after 'def'".to_string(),
+                        ))
+                    }
                 };
                 let params = if matches!(self.peek(), Some(Token::LParen)) {
                     self.advance();
@@ -460,7 +458,11 @@ impl Parser {
                             match self.advance() {
                                 Some(Token::Ident(p)) => params.push(p),
                                 Some(Token::Var(p)) => params.push(p),
-                                _ => return Err(JqError::Parse("Expected parameter name".to_string())),
+                                _ => {
+                                    return Err(JqError::Parse(
+                                        "Expected parameter name".to_string(),
+                                    ))
+                                }
                             }
                             if matches!(self.peek(), Some(Token::Semicolon)) {
                                 self.advance();

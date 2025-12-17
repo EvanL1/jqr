@@ -37,14 +37,14 @@ pub enum Token {
     Break,
 
     // Operators
-    Dot,          // .
-    DotDot,       // ..
-    Pipe,         // |
-    Semicolon,    // ;
-    Comma,        // ,
-    Colon,        // :
-    Question,     // ?
-    At,           // @
+    Dot,       // .
+    DotDot,    // ..
+    Pipe,      // |
+    Semicolon, // ;
+    Comma,     // ,
+    Colon,     // :
+    Question,  // ?
+    At,        // @
 
     // Brackets
     LParen,   // (
@@ -55,29 +55,29 @@ pub enum Token {
     RBrace,   // }
 
     // Arithmetic
-    Plus,     // +
-    Minus,    // -
-    Star,     // *
-    Slash,    // /
-    Percent,  // %
+    Plus,    // +
+    Minus,   // -
+    Star,    // *
+    Slash,   // /
+    Percent, // %
 
     // Comparison
-    Eq,       // ==
-    Ne,       // !=
-    Lt,       // <
-    Le,       // <=
-    Gt,       // >
-    Ge,       // >=
+    Eq, // ==
+    Ne, // !=
+    Lt, // <
+    Le, // <=
+    Gt, // >
+    Ge, // >=
 
     // Assignment
-    Assign,   // =
-    PipeEq,   // |=
-    PlusEq,   // +=
-    MinusEq,  // -=
-    StarEq,   // *=
-    SlashEq,  // /=
-    PercentEq,// %=
-    AltEq,    // //=
+    Assign,    // =
+    PipeEq,    // |=
+    PlusEq,    // +=
+    MinusEq,   // -=
+    StarEq,    // *=
+    SlashEq,   // /=
+    PercentEq, // %=
+    AltEq,     // //=
 
     // Other
     Alt,      // //

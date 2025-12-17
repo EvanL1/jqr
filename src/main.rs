@@ -243,10 +243,8 @@ fn sort_json_keys(value: &serde_json::Value) -> Result<serde_json::Value, ()> {
             Ok(serde_json::Value::Object(sorted))
         }
         serde_json::Value::Array(arr) => {
-            let sorted: Vec<serde_json::Value> = arr
-                .iter()
-                .map(sort_json_keys)
-                .collect::<Result<_, _>>()?;
+            let sorted: Vec<serde_json::Value> =
+                arr.iter().map(sort_json_keys).collect::<Result<_, _>>()?;
             Ok(serde_json::Value::Array(sorted))
         }
         other => Ok(other.clone()),

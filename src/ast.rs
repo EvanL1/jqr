@@ -53,14 +53,14 @@ pub enum UnaryOp {
 /// Update operators
 #[derive(Clone, Debug, PartialEq)]
 pub enum UpdateOp {
-    Assign,   // =
-    Update,   // |=
-    AddEq,    // +=
-    SubEq,    // -=
-    MulEq,    // *=
-    DivEq,    // /=
-    ModEq,    // %=
-    AltEq,    // //=
+    Assign, // =
+    Update, // |=
+    AddEq,  // +=
+    SubEq,  // -=
+    MulEq,  // *=
+    DivEq,  // /=
+    ModEq,  // %=
+    AltEq,  // //=
 }
 
 /// jq expression AST
@@ -148,10 +148,7 @@ pub enum Expr {
     },
 
     /// Function call: name or name(args)
-    FuncCall {
-        name: String,
-        args: Vec<Expr>,
-    },
+    FuncCall { name: String, args: Vec<Expr> },
 
     /// Variable reference: $var
     Var(String),
@@ -177,10 +174,7 @@ pub enum Expr {
     Optional(Box<Expr>),
 
     /// Label-break: label $name | expr
-    Label {
-        name: String,
-        body: Box<Expr>,
-    },
+    Label { name: String, body: Box<Expr> },
 
     /// Break: break $name
     Break(String),
@@ -198,19 +192,13 @@ pub enum Expr {
     GetPath(Box<Expr>),
 
     /// Set path value: setpath(path; value)
-    SetPath {
-        path: Box<Expr>,
-        value: Box<Expr>,
-    },
+    SetPath { path: Box<Expr>, value: Box<Expr> },
 
     /// Delete path: delpaths(paths)
     DelPaths(Box<Expr>),
 
     /// Limit: limit(n; expr)
-    Limit {
-        n: Box<Expr>,
-        expr: Box<Expr>,
-    },
+    Limit { n: Box<Expr>, expr: Box<Expr> },
 
     /// First: first(expr) or first
     First(Option<Box<Expr>>),
@@ -232,16 +220,10 @@ pub enum Expr {
     },
 
     /// While: while(cond; update)
-    While {
-        cond: Box<Expr>,
-        update: Box<Expr>,
-    },
+    While { cond: Box<Expr>, update: Box<Expr> },
 
     /// Until: until(cond; update)
-    Until {
-        cond: Box<Expr>,
-        update: Box<Expr>,
-    },
+    Until { cond: Box<Expr>, update: Box<Expr> },
 
     /// Recurse: recurse or recurse(f)
     Recurse(Option<Box<Expr>>),
@@ -262,10 +244,7 @@ pub enum Expr {
     Inputs,
 
     /// Function definition in expression
-    FuncDef {
-        def: FuncDef,
-        body: Box<Expr>,
-    },
+    FuncDef { def: FuncDef, body: Box<Expr> },
 }
 
 /// Object entry for object construction

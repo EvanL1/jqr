@@ -9,7 +9,7 @@ use nom::{
     combinator::{opt, recognize, value},
     multi::many0,
     sequence::{delimited, pair, preceded},
-    Parser, IResult,
+    IResult, Parser,
 };
 
 /// Lex a complete jq program into tokens
@@ -41,7 +41,8 @@ fn token(input: &str) -> IResult<&str, Token> {
         number_literal,
         // Identifiers (must be last)
         identifier,
-    )).parse(input)
+    ))
+    .parse(input)
 }
 
 fn multi_char_ops(input: &str) -> IResult<&str, Token> {
@@ -59,7 +60,8 @@ fn multi_char_ops(input: &str) -> IResult<&str, Token> {
         value(Token::StarEq, tag("*=")),
         value(Token::SlashEq, tag("/=")),
         value(Token::PercentEq, tag("%=")),
-    )).parse(input)
+    ))
+    .parse(input)
 }
 
 fn single_char_ops(input: &str) -> IResult<&str, Token> {
@@ -85,7 +87,8 @@ fn single_char_ops(input: &str) -> IResult<&str, Token> {
         value(Token::Lt, char('<')),
         value(Token::Gt, char('>')),
         value(Token::Assign, char('=')),
-    )).parse(input)
+    ))
+    .parse(input)
 }
 
 fn string_literal(input: &str) -> IResult<&str, Token> {
@@ -104,7 +107,8 @@ fn string_literal(input: &str) -> IResult<&str, Token> {
             )),
         ),
         char('"'),
-    ).parse(input)?;
+    )
+    .parse(input)?;
     Ok((input, Token::String(s)))
 }
 
@@ -120,12 +124,9 @@ fn number_literal(input: &str) -> IResult<&str, Token> {
             )),
             recognize(pair(digit1, opt(pair(char('.'), digit1)))),
         )),
-        opt((
-            one_of("eE"),
-            opt(one_of("+-")),
-            digit1,
-        )),
-    )).parse(input)?;
+        opt((one_of("eE"), opt(one_of("+-")), digit1)),
+    ))
+    .parse(input)?;
     Ok((input, Token::Number(num.to_string())))
 }
 
@@ -154,7 +155,8 @@ fn identifier_str(input: &str) -> IResult<&str, &str> {
     recognize(pair(
         take_while1(|c: char| c.is_alphabetic() || c == '_'),
         take_while(|c: char| c.is_alphanumeric() || c == '_'),
-    )).parse(input)
+    ))
+    .parse(input)
 }
 
 #[cfg(test)]
