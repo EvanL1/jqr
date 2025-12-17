@@ -5,7 +5,7 @@ A jq implementation in Rust.
 ## Installation
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/lyf/jqr/main/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/EvanL1/jqr/master/install.sh | sh
 ```
 
 Or build from source:

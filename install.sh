@@ -1,7 +1,7 @@
 #!/bin/sh
 set -e
 
-REPO="lyf/jqr"
+REPO="EvanL1/jqr"
 INSTALL_DIR="${INSTALL_DIR:-/usr/local/bin}"
 
 # Detect OS and architecture
