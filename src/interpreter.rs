@@ -200,7 +200,7 @@ pub fn eval(expr: &Expr, ctx: &Context, input: Value) -> Result<Vec<Value>> {
 
         Expr::Iterator => input.iter(),
 
-        Expr::OptionalIterator => input.iter().or(Ok(vec![])),
+        Expr::OptionalIterator => input.iter().or_else(|_| Ok(Vec::new())),
 
         Expr::Pipe(left, right) => {
             let left_results = eval(left, ctx, input)?;
@@ -266,11 +266,9 @@ pub fn eval(expr: &Expr, ctx: &Context, input: Value) -> Result<Vec<Value>> {
                         }
                     }
                 }
-                results = if new_results.is_empty() {
-                    results.to_vec()
-                } else {
-                    new_results
-                };
+                if !new_results.is_empty() {
+                    results = new_results;
+                }
             }
             Ok(results.into_iter().map(Value::object).collect())
         }
@@ -320,7 +318,7 @@ pub fn eval(expr: &Expr, ctx: &Context, input: Value) -> Result<Vec<Value>> {
                 if let Some(catch) = catch_expr {
                     eval(catch, ctx, input)
                 } else {
-                    Ok(vec![])
+                    Ok(Vec::new())
                 }
             }
         },
@@ -370,7 +368,7 @@ pub fn eval(expr: &Expr, ctx: &Context, input: Value) -> Result<Vec<Value>> {
             eval(body, &new_ctx, input)
         }
 
-        Expr::Optional(expr) => eval(expr, ctx, input).or(Ok(vec![])),
+        Expr::Optional(expr) => eval(expr, ctx, input).or_else(|_| Ok(Vec::new())),
 
         _ => Err(JqError::Custom(format!(
             "Unimplemented expression: {:?}",
@@ -379,6 +377,7 @@ pub fn eval(expr: &Expr, ctx: &Context, input: Value) -> Result<Vec<Value>> {
     }
 }
 
+#[inline]
 fn collect_recursive(value: &Value, results: &mut Vec<Value>) {
     match value {
         Value::Array(arr) => {
@@ -397,6 +396,7 @@ fn collect_recursive(value: &Value, results: &mut Vec<Value>) {
     }
 }
 
+#[inline]
 fn eval_binop(op: &BinOp, left: &Value, right: &Value) -> Result<Value> {
     match op {
         BinOp::Add => match (left, right) {
@@ -445,7 +445,12 @@ fn eval_binop(op: &BinOp, left: &Value, right: &Value) -> Result<Value> {
                 }
             }
             (Value::Array(a), Value::Array(b)) => {
-                let result: Vec<Value> = a.iter().filter(|x| !b.contains(x)).cloned().collect();
+                let mut result = Vec::with_capacity(a.len());
+                for x in a.iter() {
+                    if !b.contains(x) {
+                        result.push(x.clone());
+                    }
+                }
                 Ok(Value::array(result))
             }
             _ => Err(JqError::Type(format!(
@@ -705,7 +710,7 @@ fn eval_builtin(name: &str, args: &[Expr], ctx: &Context, input: Value) -> Resul
         "unique" => match input {
             Value::Array(arr) => {
                 // Preserve order while deduplicating
-                let mut seen = Vec::with_capacity(arr.len());
+                let mut seen = Vec::with_capacity(arr.len().min(64));
                 for item in arr.iter() {
                     if !seen.contains(item) {
                         seen.push(item.clone());
@@ -797,7 +802,7 @@ fn eval_builtin(name: &str, args: &[Expr], ctx: &Context, input: Value) -> Resul
         // Object functions
         "has" => {
             if args.is_empty() {
-                return Err(JqError::Custom("has requires 1 argument".to_string()));
+                return Err(JqError::Custom("has requires 1 argument".into()));
             }
             let keys = eval(&args[0], ctx, input.clone())?;
             let mut results = Vec::with_capacity(keys.len());
@@ -816,7 +821,7 @@ fn eval_builtin(name: &str, args: &[Expr], ctx: &Context, input: Value) -> Resul
         }
         "in" => {
             if args.is_empty() {
-                return Err(JqError::Custom("in requires 1 argument".to_string()));
+                return Err(JqError::Custom("in requires 1 argument".into()));
             }
             let containers = eval(&args[0], ctx, input.clone())?;
             let mut results = Vec::with_capacity(containers.len());
@@ -877,16 +882,16 @@ fn eval_builtin(name: &str, args: &[Expr], ctx: &Context, input: Value) -> Resul
         },
 
         // String functions
-        "tostring" => Ok(vec![Value::string(match &input {
-            Value::String(s) => (**s).clone(),
-            Value::Null => "null".to_string(),
-            Value::Bool(b) => b.to_string(),
+        "tostring" => Ok(vec![match &input {
+            Value::String(_) => input,
+            Value::Null => Value::string("null"),
+            Value::Bool(b) => Value::string(if *b { "true" } else { "false" }),
             Value::Number(n) => match n {
-                Number::Int(i) => i.to_string(),
-                Number::Float(f) => f.to_string(),
+                Number::Int(i) => Value::string(i.to_string()),
+                Number::Float(f) => Value::string(f.to_string()),
             },
-            _ => serde_json::to_string(&input.to_json()).unwrap_or_default(),
-        })]),
+            _ => Value::string(serde_json::to_string(&input.to_json()).unwrap_or_default()),
+        }]),
         "tonumber" => match &input {
             Value::Number(_) => Ok(vec![input]),
             Value::String(s) => {
@@ -919,7 +924,7 @@ fn eval_builtin(name: &str, args: &[Expr], ctx: &Context, input: Value) -> Resul
         },
         "ltrimstr" => {
             if args.is_empty() {
-                return Err(JqError::Custom("ltrimstr requires 1 argument".to_string()));
+                return Err(JqError::Custom("ltrimstr requires 1 argument".into()));
             }
             let prefixes = eval(&args[0], ctx, input.clone())?;
             let mut results = Vec::with_capacity(prefixes.len());
@@ -935,7 +940,7 @@ fn eval_builtin(name: &str, args: &[Expr], ctx: &Context, input: Value) -> Resul
         }
         "rtrimstr" => {
             if args.is_empty() {
-                return Err(JqError::Custom("rtrimstr requires 1 argument".to_string()));
+                return Err(JqError::Custom("rtrimstr requires 1 argument".into()));
             }
             let suffixes = eval(&args[0], ctx, input.clone())?;
             let mut results = Vec::with_capacity(suffixes.len());
@@ -951,7 +956,7 @@ fn eval_builtin(name: &str, args: &[Expr], ctx: &Context, input: Value) -> Resul
         }
         "split" => {
             if args.is_empty() {
-                return Err(JqError::Custom("split requires 1 argument".to_string()));
+                return Err(JqError::Custom("split requires 1 argument".into()));
             }
             let seps = eval(&args[0], ctx, input.clone())?;
             let mut results = Vec::new();
@@ -960,18 +965,18 @@ fn eval_builtin(name: &str, args: &[Expr], ctx: &Context, input: Value) -> Resul
                     (Value::String(s), Value::String(sep)) => {
                         let parts: Vec<Value> = s
                             .split(sep.as_str())
-                            .map(|p| Value::string(p.to_string()))
+                            .map(Value::string)
                             .collect();
                         results.push(Value::array(parts));
                     }
-                    _ => return Err(JqError::Type("split requires strings".to_string())),
+                    _ => return Err(JqError::Type("split requires strings".into())),
                 }
             }
             Ok(results)
         }
         "join" => {
             if args.is_empty() {
-                return Err(JqError::Custom("join requires 1 argument".to_string()));
+                return Err(JqError::Custom("join requires 1 argument".into()));
             }
             let seps = eval(&args[0], ctx, input.clone())?;
             let mut results = Vec::new();
@@ -988,14 +993,14 @@ fn eval_builtin(name: &str, args: &[Expr], ctx: &Context, input: Value) -> Resul
                             .collect();
                         results.push(Value::string(parts.join(sep.as_str())));
                     }
-                    _ => return Err(JqError::Type("join requires array and string".to_string())),
+                    _ => return Err(JqError::Type("join requires array and string".into())),
                 }
             }
             Ok(results)
         }
         "contains" => {
             if args.is_empty() {
-                return Err(JqError::Custom("contains requires 1 argument".to_string()));
+                return Err(JqError::Custom("contains requires 1 argument".into()));
             }
             let needles = eval(&args[0], ctx, input.clone())?;
             let mut results = Vec::new();
@@ -1006,7 +1011,7 @@ fn eval_builtin(name: &str, args: &[Expr], ctx: &Context, input: Value) -> Resul
         }
         "inside" => {
             if args.is_empty() {
-                return Err(JqError::Custom("inside requires 1 argument".to_string()));
+                return Err(JqError::Custom("inside requires 1 argument".into()));
             }
             let haystacks = eval(&args[0], ctx, input.clone())?;
             let mut results = Vec::new();
@@ -1017,9 +1022,7 @@ fn eval_builtin(name: &str, args: &[Expr], ctx: &Context, input: Value) -> Resul
         }
         "startswith" => {
             if args.is_empty() {
-                return Err(JqError::Custom(
-                    "startswith requires 1 argument".to_string(),
-                ));
+                return Err(JqError::Custom("startswith requires 1 argument".into()));
             }
             let prefixes = eval(&args[0], ctx, input.clone())?;
             let mut results = Vec::new();
@@ -1028,14 +1031,14 @@ fn eval_builtin(name: &str, args: &[Expr], ctx: &Context, input: Value) -> Resul
                     (Value::String(s), Value::String(p)) => {
                         results.push(Value::Bool(s.starts_with(p.as_str())));
                     }
-                    _ => return Err(JqError::Type("startswith requires strings".to_string())),
+                    _ => return Err(JqError::Type("startswith requires strings".into())),
                 }
             }
             Ok(results)
         }
         "endswith" => {
             if args.is_empty() {
-                return Err(JqError::Custom("endswith requires 1 argument".to_string()));
+                return Err(JqError::Custom("endswith requires 1 argument".into()));
             }
             let suffixes = eval(&args[0], ctx, input.clone())?;
             let mut results = Vec::new();
@@ -1044,7 +1047,7 @@ fn eval_builtin(name: &str, args: &[Expr], ctx: &Context, input: Value) -> Resul
                     (Value::String(s), Value::String(p)) => {
                         results.push(Value::Bool(s.ends_with(p.as_str())));
                     }
-                    _ => return Err(JqError::Type("endswith requires strings".to_string())),
+                    _ => return Err(JqError::Type("endswith requires strings".into())),
                 }
             }
             Ok(results)
@@ -1053,7 +1056,7 @@ fn eval_builtin(name: &str, args: &[Expr], ctx: &Context, input: Value) -> Resul
         // Regex functions
         "test" => {
             if args.is_empty() {
-                return Err(JqError::Custom("test requires 1 argument".to_string()));
+                return Err(JqError::Custom("test requires 1 argument".into()));
             }
             let patterns = eval(&args[0], ctx, input.clone())?;
             let flags = if args.len() > 1 {
@@ -1077,18 +1080,14 @@ fn eval_builtin(name: &str, args: &[Expr], ctx: &Context, input: Value) -> Resul
                             .map_err(|e| JqError::Custom(format!("Invalid regex: {}", e)))?;
                         results.push(Value::Bool(re.is_match(s)));
                     }
-                    _ => {
-                        return Err(JqError::Type(
-                            "test requires string and pattern".to_string(),
-                        ))
-                    }
+                    _ => return Err(JqError::Type("test requires string and pattern".into())),
                 }
             }
             Ok(results)
         }
         "match" => {
             if args.is_empty() {
-                return Err(JqError::Custom("match requires 1 argument".to_string()));
+                return Err(JqError::Custom("match requires 1 argument".into()));
             }
             let patterns = eval(&args[0], ctx, input.clone())?;
             let flags = if args.len() > 1 {
@@ -1120,18 +1119,14 @@ fn eval_builtin(name: &str, args: &[Expr], ctx: &Context, input: Value) -> Resul
                             results.push(build_match_object(&cap, s));
                         }
                     }
-                    _ => {
-                        return Err(JqError::Type(
-                            "match requires string and pattern".to_string(),
-                        ))
-                    }
+                    _ => return Err(JqError::Type("match requires string and pattern".into())),
                 }
             }
             Ok(results)
         }
         "capture" => {
             if args.is_empty() {
-                return Err(JqError::Custom("capture requires 1 argument".to_string()));
+                return Err(JqError::Custom("capture requires 1 argument".into()));
             }
             let patterns = eval(&args[0], ctx, input.clone())?;
             let flags = if args.len() > 1 {
@@ -1164,18 +1159,14 @@ fn eval_builtin(name: &str, args: &[Expr], ctx: &Context, input: Value) -> Resul
                             results.push(Value::object(obj));
                         }
                     }
-                    _ => {
-                        return Err(JqError::Type(
-                            "capture requires string and pattern".to_string(),
-                        ))
-                    }
+                    _ => return Err(JqError::Type("capture requires string and pattern".into())),
                 }
             }
             Ok(results)
         }
         "splits" => {
             if args.is_empty() {
-                return Err(JqError::Custom("splits requires 1 argument".to_string()));
+                return Err(JqError::Custom("splits requires 1 argument".into()));
             }
             let patterns = eval(&args[0], ctx, input.clone())?;
             let flags = if args.len() > 1 {
@@ -1198,21 +1189,17 @@ fn eval_builtin(name: &str, args: &[Expr], ctx: &Context, input: Value) -> Resul
                         let re = Regex::new(&regex_pattern)
                             .map_err(|e| JqError::Custom(format!("Invalid regex: {}", e)))?;
                         for part in re.split(s) {
-                            results.push(Value::string(part.to_string()));
+                            results.push(Value::string(part));
                         }
                     }
-                    _ => {
-                        return Err(JqError::Type(
-                            "splits requires string and pattern".to_string(),
-                        ))
-                    }
+                    _ => return Err(JqError::Type("splits requires string and pattern".into())),
                 }
             }
             Ok(results)
         }
         "sub" => {
             if args.len() < 2 {
-                return Err(JqError::Custom("sub requires 2 arguments".to_string()));
+                return Err(JqError::Custom("sub requires 2 arguments".into()));
             }
             let patterns = eval(&args[0], ctx, input.clone())?;
             let replacements = eval(&args[1], ctx, input.clone())?;
@@ -1241,7 +1228,7 @@ fn eval_builtin(name: &str, args: &[Expr], ctx: &Context, input: Value) -> Resul
                             let result = re.replace(s, replacement_str.as_str()).to_string();
                             results.push(Value::string(result));
                         }
-                        _ => return Err(JqError::Type("sub requires strings".to_string())),
+                        _ => return Err(JqError::Type("sub requires strings".into())),
                     }
                 }
             }
@@ -1249,7 +1236,7 @@ fn eval_builtin(name: &str, args: &[Expr], ctx: &Context, input: Value) -> Resul
         }
         "gsub" => {
             if args.len() < 2 {
-                return Err(JqError::Custom("gsub requires 2 arguments".to_string()));
+                return Err(JqError::Custom("gsub requires 2 arguments".into()));
             }
             let patterns = eval(&args[0], ctx, input.clone())?;
             let replacements = eval(&args[1], ctx, input.clone())?;
@@ -1278,7 +1265,7 @@ fn eval_builtin(name: &str, args: &[Expr], ctx: &Context, input: Value) -> Resul
                             let result = re.replace_all(s, replacement_str.as_str()).to_string();
                             results.push(Value::string(result));
                         }
-                        _ => return Err(JqError::Type("gsub requires strings".to_string())),
+                        _ => return Err(JqError::Type("gsub requires strings".into())),
                     }
                 }
             }
@@ -1286,7 +1273,7 @@ fn eval_builtin(name: &str, args: &[Expr], ctx: &Context, input: Value) -> Resul
         }
         "scan" => {
             if args.is_empty() {
-                return Err(JqError::Custom("scan requires 1 argument".to_string()));
+                return Err(JqError::Custom("scan requires 1 argument".into()));
             }
             let patterns = eval(&args[0], ctx, input.clone())?;
             let flags = if args.len() > 1 {
@@ -1322,15 +1309,11 @@ fn eval_builtin(name: &str, args: &[Expr], ctx: &Context, input: Value) -> Resul
                                 results.push(Value::array(captures));
                             } else {
                                 // No capture groups - return the full match
-                                results.push(Value::string(cap[0].to_string()));
+                                results.push(Value::string(&cap[0]));
                             }
                         }
                     }
-                    _ => {
-                        return Err(JqError::Type(
-                            "scan requires string and pattern".to_string(),
-                        ))
-                    }
+                    _ => return Err(JqError::Type("scan requires string and pattern".into())),
                 }
             }
             Ok(results)
@@ -1359,23 +1342,23 @@ fn eval_builtin(name: &str, args: &[Expr], ctx: &Context, input: Value) -> Resul
         },
 
         // Misc
-        "empty" => Ok(vec![]),
+        "empty" => Ok(Vec::new()),
         "error" => {
             if args.is_empty() {
-                Err(JqError::Custom("error".to_string()))
+                Err(JqError::Custom("error".into()))
             } else {
                 let msgs = eval(&args[0], ctx, input)?;
                 match msgs.first() {
                     Some(Value::String(s)) => Err(JqError::Custom((**s).clone())),
                     Some(v) => Err(JqError::Custom(format!("{}", v))),
-                    None => Err(JqError::Custom("error".to_string())),
+                    None => Err(JqError::Custom("error".into())),
                 }
             }
         }
         "not" => Ok(vec![Value::Bool(!input.is_truthy())]),
         "select" => {
             if args.is_empty() {
-                return Err(JqError::Custom("select requires 1 argument".to_string()));
+                return Err(JqError::Custom("select requires 1 argument".into()));
             }
             let conds = eval(&args[0], ctx, input.clone())?;
             if conds.iter().any(|v| v.is_truthy()) {
@@ -1386,11 +1369,11 @@ fn eval_builtin(name: &str, args: &[Expr], ctx: &Context, input: Value) -> Resul
         }
         "map" => {
             if args.is_empty() {
-                return Err(JqError::Custom("map requires 1 argument".to_string()));
+                return Err(JqError::Custom("map requires 1 argument".into()));
             }
             match input {
                 Value::Array(arr) => {
-                    let mut results = Vec::new();
+                    let mut results = Vec::with_capacity(arr.len());
                     for item in arr.iter() {
                         results.extend(eval(&args[0], ctx, item.clone())?);
                     }
@@ -1404,13 +1387,11 @@ fn eval_builtin(name: &str, args: &[Expr], ctx: &Context, input: Value) -> Resul
         }
         "map_values" => {
             if args.is_empty() {
-                return Err(JqError::Custom(
-                    "map_values requires 1 argument".to_string(),
-                ));
+                return Err(JqError::Custom("map_values requires 1 argument".into()));
             }
             match input {
                 Value::Array(arr) => {
-                    let mut results = Vec::new();
+                    let mut results = Vec::with_capacity(arr.len());
                     for item in arr.iter() {
                         let mapped = eval(&args[0], ctx, item.clone())?;
                         if let Some(v) = mapped.into_iter().next() {
@@ -1420,7 +1401,7 @@ fn eval_builtin(name: &str, args: &[Expr], ctx: &Context, input: Value) -> Resul
                     Ok(vec![Value::array(results)])
                 }
                 Value::Object(obj) => {
-                    let mut result = IndexMap::new();
+                    let mut result = IndexMap::with_capacity(obj.len());
                     for (k, v) in obj.iter() {
                         let mapped = eval(&args[0], ctx, v.clone())?;
                         if let Some(new_v) = mapped.into_iter().next() {
@@ -1437,7 +1418,7 @@ fn eval_builtin(name: &str, args: &[Expr], ctx: &Context, input: Value) -> Resul
         }
         "group_by" => {
             if args.is_empty() {
-                return Err(JqError::Custom("group_by requires 1 argument".to_string()));
+                return Err(JqError::Custom("group_by requires 1 argument".into()));
             }
             match input {
                 Value::Array(arr) => {
@@ -1459,7 +1440,7 @@ fn eval_builtin(name: &str, args: &[Expr], ctx: &Context, input: Value) -> Resul
         }
         "sort_by" => {
             if args.is_empty() {
-                return Err(JqError::Custom("sort_by requires 1 argument".to_string()));
+                return Err(JqError::Custom("sort_by requires 1 argument".into()));
             }
             match input {
                 Value::Array(arr) => {
@@ -1490,7 +1471,7 @@ fn eval_builtin(name: &str, args: &[Expr], ctx: &Context, input: Value) -> Resul
         }
         "unique_by" => {
             if args.is_empty() {
-                return Err(JqError::Custom("unique_by requires 1 argument".to_string()));
+                return Err(JqError::Custom("unique_by requires 1 argument".into()));
             }
             match input {
                 Value::Array(arr) => {
@@ -1611,7 +1592,7 @@ fn eval_builtin(name: &str, args: &[Expr], ctx: &Context, input: Value) -> Resul
                 }
             };
             if step == 0 {
-                return Err(JqError::Custom("range step cannot be 0".to_string()));
+                return Err(JqError::Custom("range step cannot be 0".into()));
             }
             let mut results = Vec::new();
             let mut i = from;
@@ -1630,9 +1611,7 @@ fn eval_builtin(name: &str, args: &[Expr], ctx: &Context, input: Value) -> Resul
         }
         "nth" => {
             if args.is_empty() {
-                return Err(JqError::Custom(
-                    "nth requires at least 1 argument".to_string(),
-                ));
+                return Err(JqError::Custom("nth requires at least 1 argument".into()));
             }
             let n = eval(&args[0], ctx, input.clone())?
                 .into_iter()
@@ -1641,7 +1620,7 @@ fn eval_builtin(name: &str, args: &[Expr], ctx: &Context, input: Value) -> Resul
                     Value::Number(num) => num.as_i64(),
                     _ => None,
                 })
-                .ok_or_else(|| JqError::Type("nth requires a number".to_string()))?;
+                .ok_or_else(|| JqError::Type("nth requires a number".into()))?;
             if n < 0 {
                 return Ok(vec![]);
             }
@@ -1651,7 +1630,7 @@ fn eval_builtin(name: &str, args: &[Expr], ctx: &Context, input: Value) -> Resul
             } else {
                 match input {
                     Value::Array(arr) => Ok(arr.get(n as usize).cloned().into_iter().collect()),
-                    _ => Err(JqError::Type("nth requires array".to_string())),
+                    _ => Err(JqError::Type("nth requires array".into())),
                 }
             }
         }
@@ -1725,6 +1704,7 @@ fn eval_builtin(name: &str, args: &[Expr], ctx: &Context, input: Value) -> Resul
     }
 }
 
+#[inline]
 fn value_contains(haystack: &Value, needle: &Value) -> bool {
     match (haystack, needle) {
         (Value::String(h), Value::String(n)) => h.contains(n.as_str()),

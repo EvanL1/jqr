@@ -103,6 +103,7 @@ impl Parser {
     }
 
     /// Parse logical or: expr or expr
+    #[inline]
     fn parse_or(&mut self) -> Result<Expr> {
         let mut left = self.parse_and()?;
         while matches!(self.peek(), Some(Token::Or)) {
@@ -114,6 +115,7 @@ impl Parser {
     }
 
     /// Parse logical and: expr and expr
+    #[inline]
     fn parse_and(&mut self) -> Result<Expr> {
         let mut left = self.parse_not()?;
         while matches!(self.peek(), Some(Token::And)) {
@@ -125,6 +127,7 @@ impl Parser {
     }
 
     /// Parse not: not expr
+    #[inline]
     fn parse_not(&mut self) -> Result<Expr> {
         if matches!(self.peek(), Some(Token::Not)) {
             self.advance();
@@ -136,6 +139,7 @@ impl Parser {
     }
 
     /// Parse comparison: expr == expr, expr < expr, etc.
+    #[inline]
     fn parse_comparison(&mut self) -> Result<Expr> {
         let left = self.parse_additive()?;
         let op = match self.peek() {
@@ -157,6 +161,7 @@ impl Parser {
     }
 
     /// Parse additive: expr + expr, expr - expr
+    #[inline]
     fn parse_additive(&mut self) -> Result<Expr> {
         let mut left = self.parse_multiplicative()?;
         loop {
@@ -173,6 +178,7 @@ impl Parser {
     }
 
     /// Parse multiplicative: expr * expr, expr / expr, expr % expr
+    #[inline]
     fn parse_multiplicative(&mut self) -> Result<Expr> {
         let mut left = self.parse_unary()?;
         loop {
@@ -190,6 +196,7 @@ impl Parser {
     }
 
     /// Parse unary: -expr
+    #[inline]
     fn parse_unary(&mut self) -> Result<Expr> {
         if matches!(self.peek(), Some(Token::Minus)) {
             self.advance();
@@ -265,6 +272,7 @@ impl Parser {
     }
 
     /// Parse primary expressions
+    #[inline]
     fn parse_primary(&mut self) -> Result<Expr> {
         match self.peek().cloned() {
             // Recursive descent: ..
@@ -433,7 +441,7 @@ impl Parser {
                 self.expect(&Token::As)?;
                 let var = match self.advance() {
                     Some(Token::Var(name)) => name,
-                    _ => return Err(JqError::Parse("Expected variable after 'as'".to_string())),
+                    _ => return Err(JqError::Parse("Expected variable after 'as'".into())),
                 };
                 self.expect(&Token::LParen)?;
                 let init = self.parse_expr()?;
@@ -453,11 +461,7 @@ impl Parser {
                 self.advance();
                 let name = match self.advance() {
                     Some(Token::Ident(name)) => name,
-                    _ => {
-                        return Err(JqError::Parse(
-                            "Expected function name after 'def'".to_string(),
-                        ))
-                    }
+                    _ => return Err(JqError::Parse("Expected function name after 'def'".into())),
                 };
                 let params = if matches!(self.peek(), Some(Token::LParen)) {
                     self.advance();
@@ -467,11 +471,7 @@ impl Parser {
                             match self.advance() {
                                 Some(Token::Ident(p)) => params.push(p),
                                 Some(Token::Var(p)) => params.push(p),
-                                _ => {
-                                    return Err(JqError::Parse(
-                                        "Expected parameter name".to_string(),
-                                    ))
-                                }
+                                _ => return Err(JqError::Parse("Expected parameter name".into())),
                             }
                             if matches!(self.peek(), Some(Token::Semicolon)) {
                                 self.advance();
@@ -525,11 +525,12 @@ impl Parser {
             }
 
             Some(token) => Err(JqError::Parse(format!("Unexpected token: {:?}", token))),
-            None => Err(JqError::Parse("Unexpected end of input".to_string())),
+            None => Err(JqError::Parse("Unexpected end of input".into())),
         }
     }
 
     /// Parse an object entry
+    #[inline]
     fn parse_object_entry(&mut self) -> Result<ObjectEntry> {
         match self.peek().cloned() {
             Some(Token::Ident(name)) => {
@@ -567,7 +568,7 @@ impl Parser {
                     value: Box::new(value),
                 })
             }
-            _ => Err(JqError::Parse("Expected object key".to_string())),
+            _ => Err(JqError::Parse("Expected object key".into())),
         }
     }
 }

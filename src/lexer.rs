@@ -156,6 +156,7 @@ fn identifier(input: &str) -> IResult<&str, Token> {
     }
 }
 
+#[inline]
 fn identifier_str(input: &str) -> IResult<&str, &str> {
     recognize(pair(
         take_while1(|c: char| c.is_alphabetic() || c == '_'),

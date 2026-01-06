@@ -345,4 +345,506 @@ mod tests {
             _ => panic!("Expected object"),
         }
     }
+
+    // =========== Phase 5: Additional comprehensive tests ===========
+
+    // Math function tests
+    #[test]
+    fn test_floor() {
+        let results = run("floor", "3.7").unwrap();
+        assert_eq!(results, vec![Value::Number(Number::Int(3))]);
+    }
+
+    #[test]
+    fn test_ceil() {
+        let results = run("ceil", "3.2").unwrap();
+        assert_eq!(results, vec![Value::Number(Number::Int(4))]);
+    }
+
+    #[test]
+    fn test_round() {
+        let results = run("round", "3.5").unwrap();
+        assert_eq!(results, vec![Value::Number(Number::Int(4))]);
+    }
+
+    #[test]
+    fn test_sqrt() {
+        let results = run("sqrt", "16").unwrap();
+        match &results[0] {
+            Value::Number(Number::Float(f)) => assert!((f - 4.0).abs() < 0.0001),
+            _ => panic!("Expected float"),
+        }
+    }
+
+    #[test]
+    fn test_fabs() {
+        let results = run("fabs", "-5.5").unwrap();
+        match &results[0] {
+            Value::Number(Number::Float(f)) => assert!((f - 5.5).abs() < 0.0001),
+            _ => panic!("Expected float"),
+        }
+    }
+
+    // String function tests
+    #[test]
+    fn test_ltrimstr() {
+        let results = run(r#"ltrimstr("hello ")"#, r#""hello world""#).unwrap();
+        assert_eq!(results, vec![Value::string("world")]);
+    }
+
+    #[test]
+    fn test_rtrimstr() {
+        let results = run(r#"rtrimstr(" world")"#, r#""hello world""#).unwrap();
+        assert_eq!(results, vec![Value::string("hello")]);
+    }
+
+    #[test]
+    fn test_startswith() {
+        let results = run(r#"startswith("hello")"#, r#""hello world""#).unwrap();
+        assert_eq!(results, vec![Value::Bool(true)]);
+    }
+
+    #[test]
+    fn test_endswith() {
+        let results = run(r#"endswith("world")"#, r#""hello world""#).unwrap();
+        assert_eq!(results, vec![Value::Bool(true)]);
+    }
+
+    #[test]
+    fn test_ascii_downcase() {
+        let results = run("ascii_downcase", r#""HELLO""#).unwrap();
+        assert_eq!(results, vec![Value::string("hello")]);
+    }
+
+    #[test]
+    fn test_ascii_upcase() {
+        let results = run("ascii_upcase", r#""hello""#).unwrap();
+        assert_eq!(results, vec![Value::string("HELLO")]);
+    }
+
+    #[test]
+    fn test_tostring() {
+        let results = run("tostring", "42").unwrap();
+        assert_eq!(results, vec![Value::string("42")]);
+    }
+
+    #[test]
+    fn test_tonumber() {
+        let results = run("tonumber", r#""42""#).unwrap();
+        assert_eq!(results, vec![Value::Number(Number::Int(42))]);
+    }
+
+    // Array function tests
+    #[test]
+    fn test_min() {
+        let results = run("min", r#"[3, 1, 2]"#).unwrap();
+        assert_eq!(results, vec![Value::Number(Number::Int(1))]);
+    }
+
+    #[test]
+    fn test_max() {
+        let results = run("max", r#"[3, 1, 2]"#).unwrap();
+        assert_eq!(results, vec![Value::Number(Number::Int(3))]);
+    }
+
+    #[test]
+    fn test_add() {
+        let results = run("add", r#"[1, 2, 3]"#).unwrap();
+        assert_eq!(results, vec![Value::Number(Number::Int(6))]);
+    }
+
+    #[test]
+    fn test_add_strings() {
+        let results = run("add", r#"["a", "b", "c"]"#).unwrap();
+        assert_eq!(results, vec![Value::string("abc")]);
+    }
+
+    #[test]
+    fn test_flatten() {
+        let results = run("flatten", r#"[[1, 2], [3, [4, 5]]]"#).unwrap();
+        assert_eq!(results.len(), 1);
+        match &results[0] {
+            Value::Array(arr) => {
+                assert_eq!(arr.len(), 5);
+            }
+            _ => panic!("Expected array"),
+        }
+    }
+
+    #[test]
+    fn test_flatten_depth() {
+        let results = run("flatten(1)", r#"[[1, [2]], [3]]"#).unwrap();
+        assert_eq!(results.len(), 1);
+        match &results[0] {
+            Value::Array(arr) => {
+                assert_eq!(arr.len(), 3);
+            }
+            _ => panic!("Expected array"),
+        }
+    }
+
+    #[test]
+    fn test_first() {
+        let results = run("first", r#"[1, 2, 3]"#).unwrap();
+        assert_eq!(results, vec![Value::Number(Number::Int(1))]);
+    }
+
+    #[test]
+    fn test_last() {
+        let results = run("last", r#"[1, 2, 3]"#).unwrap();
+        assert_eq!(results, vec![Value::Number(Number::Int(3))]);
+    }
+
+    #[test]
+    fn test_nth() {
+        let results = run("nth(1)", r#"[10, 20, 30]"#).unwrap();
+        assert_eq!(results, vec![Value::Number(Number::Int(20))]);
+    }
+
+    #[test]
+    fn test_group_by() {
+        let results =
+            run("group_by(.type)", r#"[{"type":"a"},{"type":"b"},{"type":"a"}]"#).unwrap();
+        assert_eq!(results.len(), 1);
+        match &results[0] {
+            Value::Array(arr) => {
+                assert_eq!(arr.len(), 2);
+            }
+            _ => panic!("Expected array"),
+        }
+    }
+
+    #[test]
+    fn test_sort_by() {
+        let results = run("sort_by(.x)", r#"[{"x":2},{"x":1},{"x":3}]"#).unwrap();
+        assert_eq!(results.len(), 1);
+        match &results[0] {
+            Value::Array(arr) => {
+                if let Value::Object(obj) = &arr[0] {
+                    assert_eq!(obj.get("x"), Some(&Value::Number(Number::Int(1))));
+                }
+            }
+            _ => panic!("Expected array"),
+        }
+    }
+
+    #[test]
+    fn test_unique_by() {
+        let results = run("unique_by(.x)", r#"[{"x":1,"y":1},{"x":1,"y":2},{"x":2}]"#).unwrap();
+        assert_eq!(results.len(), 1);
+        match &results[0] {
+            Value::Array(arr) => {
+                assert_eq!(arr.len(), 2);
+            }
+            _ => panic!("Expected array"),
+        }
+    }
+
+    // Object function tests
+    #[test]
+    fn test_has() {
+        let results = run(r#"has("a")"#, r#"{"a": 1}"#).unwrap();
+        assert_eq!(results, vec![Value::Bool(true)]);
+
+        let results = run(r#"has("b")"#, r#"{"a": 1}"#).unwrap();
+        assert_eq!(results, vec![Value::Bool(false)]);
+    }
+
+    #[test]
+    fn test_in() {
+        let results = run(r#"in({"a": 1})"#, r#""a""#).unwrap();
+        assert_eq!(results, vec![Value::Bool(true)]);
+    }
+
+    #[test]
+    fn test_contains() {
+        let results = run(r#"contains("wor")"#, r#""hello world""#).unwrap();
+        assert_eq!(results, vec![Value::Bool(true)]);
+    }
+
+    #[test]
+    fn test_inside() {
+        let results = run(r#"inside("hello world")"#, r#""wor""#).unwrap();
+        assert_eq!(results, vec![Value::Bool(true)]);
+    }
+
+    #[test]
+    fn test_from_entries() {
+        let results = run("from_entries", r#"[{"key":"a","value":1},{"key":"b","value":2}]"#).unwrap();
+        assert_eq!(results.len(), 1);
+        match &results[0] {
+            Value::Object(obj) => {
+                assert_eq!(obj.get("a"), Some(&Value::Number(Number::Int(1))));
+                assert_eq!(obj.get("b"), Some(&Value::Number(Number::Int(2))));
+            }
+            _ => panic!("Expected object"),
+        }
+    }
+
+    // Control flow tests
+    #[test]
+    fn test_empty() {
+        let results = run("empty", "null").unwrap();
+        assert_eq!(results.len(), 0);
+    }
+
+    #[test]
+    fn test_not() {
+        let results = run("not .", "true").unwrap();
+        assert_eq!(results, vec![Value::Bool(false)]);
+
+        let results = run("not .", "false").unwrap();
+        assert_eq!(results, vec![Value::Bool(true)]);
+    }
+
+    #[test]
+    fn test_any() {
+        let results = run("any", r#"[false, true, false]"#).unwrap();
+        assert_eq!(results, vec![Value::Bool(true)]);
+    }
+
+    #[test]
+    fn test_all() {
+        let results = run("all", r#"[true, true, true]"#).unwrap();
+        assert_eq!(results, vec![Value::Bool(true)]);
+
+        let results = run("all", r#"[true, false, true]"#).unwrap();
+        assert_eq!(results, vec![Value::Bool(false)]);
+    }
+
+    // Edge cases
+    #[test]
+    fn test_null_field_access() {
+        let results = run(".foo", "null").unwrap();
+        assert_eq!(results, vec![Value::Null]);
+    }
+
+    #[test]
+    fn test_null_index() {
+        let results = run(".[0]", "null").unwrap();
+        assert_eq!(results, vec![Value::Null]);
+    }
+
+    #[test]
+    fn test_negative_index() {
+        let results = run(".[-1]", r#"[1, 2, 3]"#).unwrap();
+        assert_eq!(results, vec![Value::Number(Number::Int(3))]);
+    }
+
+    #[test]
+    fn test_slice() {
+        let results = run(".[1:3]", r#"[0, 1, 2, 3, 4]"#).unwrap();
+        assert_eq!(results.len(), 1);
+        match &results[0] {
+            Value::Array(arr) => {
+                assert_eq!(arr.len(), 2);
+                assert_eq!(arr[0], Value::Number(Number::Int(1)));
+                assert_eq!(arr[1], Value::Number(Number::Int(2)));
+            }
+            _ => panic!("Expected array"),
+        }
+    }
+
+    #[test]
+    fn test_string_slice() {
+        let results = run(".[1:4]", r#""hello""#).unwrap();
+        assert_eq!(results, vec![Value::string("ell")]);
+    }
+
+    #[test]
+    fn test_integer_arithmetic() {
+        // Test that integer arithmetic is preserved
+        let results = run(". + 1", "5").unwrap();
+        assert_eq!(results, vec![Value::Number(Number::Int(6))]);
+
+        let results = run(". - 1", "5").unwrap();
+        assert_eq!(results, vec![Value::Number(Number::Int(4))]);
+
+        let results = run(". * 2", "5").unwrap();
+        assert_eq!(results, vec![Value::Number(Number::Int(10))]);
+    }
+
+    #[test]
+    fn test_modulo() {
+        let results = run(". % 3", "7").unwrap();
+        assert_eq!(results, vec![Value::Number(Number::Int(1))]);
+    }
+
+    #[test]
+    fn test_comparison_operators() {
+        let results = run(". == 5", "5").unwrap();
+        assert_eq!(results, vec![Value::Bool(true)]);
+
+        let results = run(". != 5", "5").unwrap();
+        assert_eq!(results, vec![Value::Bool(false)]);
+
+        let results = run(". < 10", "5").unwrap();
+        assert_eq!(results, vec![Value::Bool(true)]);
+
+        let results = run(". <= 5", "5").unwrap();
+        assert_eq!(results, vec![Value::Bool(true)]);
+
+        let results = run(". > 3", "5").unwrap();
+        assert_eq!(results, vec![Value::Bool(true)]);
+
+        let results = run(". >= 5", "5").unwrap();
+        assert_eq!(results, vec![Value::Bool(true)]);
+    }
+
+    #[test]
+    fn test_logical_operators() {
+        let results = run("true and true", "null").unwrap();
+        assert_eq!(results, vec![Value::Bool(true)]);
+
+        let results = run("true and false", "null").unwrap();
+        assert_eq!(results, vec![Value::Bool(false)]);
+
+        let results = run("true or false", "null").unwrap();
+        assert_eq!(results, vec![Value::Bool(true)]);
+    }
+
+    #[test]
+    fn test_map_values() {
+        let results = run("map_values(. + 1)", r#"{"a": 1, "b": 2}"#).unwrap();
+        assert_eq!(results.len(), 1);
+        match &results[0] {
+            Value::Object(obj) => {
+                assert_eq!(obj.get("a"), Some(&Value::Number(Number::Int(2))));
+                assert_eq!(obj.get("b"), Some(&Value::Number(Number::Int(3))));
+            }
+            _ => panic!("Expected object"),
+        }
+    }
+
+    #[test]
+    fn test_values() {
+        let results = run("values", r#"{"a": 1, "b": 2}"#).unwrap();
+        assert_eq!(results.len(), 1);
+        match &results[0] {
+            Value::Array(arr) => {
+                assert_eq!(arr.len(), 2);
+            }
+            _ => panic!("Expected array"),
+        }
+    }
+
+    #[test]
+    fn test_type_selectors() {
+        let results = run("nulls", "null").unwrap();
+        assert_eq!(results, vec![Value::Null]);
+
+        let results = run("booleans", "true").unwrap();
+        assert_eq!(results, vec![Value::Bool(true)]);
+
+        let results = run("numbers", "42").unwrap();
+        assert_eq!(results, vec![Value::Number(Number::Int(42))]);
+
+        let results = run("strings", r#""hello""#).unwrap();
+        assert_eq!(results, vec![Value::string("hello")]);
+
+        let results = run("arrays", "[]").unwrap();
+        assert_eq!(results.len(), 1);
+
+        let results = run("objects", "{}").unwrap();
+        assert_eq!(results.len(), 1);
+    }
+
+    #[test]
+    fn test_recurse() {
+        let results = run("recurse(.a?) | .b?", r#"{"a": {"a": {"b": 1}}, "b": 0}"#).unwrap();
+        // Should find all .b values in the recursive structure
+        assert!(results.len() >= 1);
+    }
+
+    #[test]
+    fn test_range_with_step() {
+        let results = run("range(0; 10; 2)", "null").unwrap();
+        assert_eq!(results.len(), 5);
+        assert_eq!(results[0], Value::Number(Number::Int(0)));
+        assert_eq!(results[1], Value::Number(Number::Int(2)));
+        assert_eq!(results[4], Value::Number(Number::Int(8)));
+    }
+
+    #[test]
+    fn test_object_merge() {
+        let results = run(". + {c: 3}", r#"{"a": 1, "b": 2}"#).unwrap();
+        assert_eq!(results.len(), 1);
+        match &results[0] {
+            Value::Object(obj) => {
+                assert_eq!(obj.len(), 3);
+            }
+            _ => panic!("Expected object"),
+        }
+    }
+
+    #[test]
+    fn test_array_concatenation() {
+        let results = run(". + [4, 5]", r#"[1, 2, 3]"#).unwrap();
+        assert_eq!(results.len(), 1);
+        match &results[0] {
+            Value::Array(arr) => {
+                assert_eq!(arr.len(), 5);
+            }
+            _ => panic!("Expected array"),
+        }
+    }
+
+    #[test]
+    fn test_string_concatenation() {
+        let results = run(r#". + " world""#, r#""hello""#).unwrap();
+        assert_eq!(results, vec![Value::string("hello world")]);
+    }
+
+    #[test]
+    fn test_string_multiplication() {
+        let results = run(". * 3", r#""ab""#).unwrap();
+        assert_eq!(results, vec![Value::string("ababab")]);
+    }
+
+    #[test]
+    fn test_string_division() {
+        let results = run(r#". / ",""#, r#""a,b,c""#).unwrap();
+        assert_eq!(results.len(), 1);
+        match &results[0] {
+            Value::Array(arr) => {
+                assert_eq!(arr.len(), 3);
+            }
+            _ => panic!("Expected array"),
+        }
+    }
+
+    #[test]
+    fn test_array_subtraction() {
+        let results = run(". - [2, 4]", r#"[1, 2, 3, 4, 5]"#).unwrap();
+        assert_eq!(results.len(), 1);
+        match &results[0] {
+            Value::Array(arr) => {
+                assert_eq!(arr.len(), 3);
+                assert_eq!(arr[0], Value::Number(Number::Int(1)));
+                assert_eq!(arr[1], Value::Number(Number::Int(3)));
+                assert_eq!(arr[2], Value::Number(Number::Int(5)));
+            }
+            _ => panic!("Expected array"),
+        }
+    }
+
+    #[test]
+    fn test_optional_field() {
+        let results = run(".foo?", r#"{"bar": 1}"#).unwrap();
+        assert_eq!(results, vec![Value::Null]);
+    }
+
+    #[test]
+    fn test_optional_iterator() {
+        let results = run(".[]?", "null").unwrap();
+        assert_eq!(results.len(), 0);
+    }
+
+    #[test]
+    fn test_comma_operator() {
+        let results = run(".a, .b", r#"{"a": 1, "b": 2}"#).unwrap();
+        assert_eq!(results.len(), 2);
+        assert_eq!(results[0], Value::Number(Number::Int(1)));
+        assert_eq!(results[1], Value::Number(Number::Int(2)));
+    }
 }

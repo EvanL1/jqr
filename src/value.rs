@@ -28,6 +28,7 @@ pub enum Number {
 }
 
 impl Number {
+    #[inline(always)]
     pub fn as_f64(&self) -> f64 {
         match self {
             Number::Int(i) => *i as f64,
@@ -35,6 +36,7 @@ impl Number {
         }
     }
 
+    #[inline(always)]
     pub fn as_i64(&self) -> Option<i64> {
         match self {
             Number::Int(i) => Some(*i),
@@ -48,6 +50,7 @@ impl Number {
         }
     }
 
+    #[inline(always)]
     pub fn is_integer(&self) -> bool {
         match self {
             Number::Int(_) => true,
@@ -97,21 +100,24 @@ impl PartialOrd for Number {
 }
 
 impl Value {
-    // Constructors for convenience
+    // Constructors for convenience - inlined for hot paths
+    #[inline(always)]
     pub fn string(s: impl Into<String>) -> Self {
         Value::String(Rc::new(s.into()))
     }
 
+    #[inline(always)]
     pub fn array(items: Vec<Value>) -> Self {
         Value::Array(Rc::new(items))
     }
 
+    #[inline(always)]
     pub fn object(map: IndexMap<String, Value>) -> Self {
         Value::Object(Rc::new(map))
     }
 
     /// Get the type name of this value
-    #[inline]
+    #[inline(always)]
     pub fn type_name(&self) -> &'static str {
         match self {
             Value::Null => "null",
@@ -124,13 +130,13 @@ impl Value {
     }
 
     /// Check if value is null
-    #[inline]
+    #[inline(always)]
     pub fn is_null(&self) -> bool {
         matches!(self, Value::Null)
     }
 
     /// Check if value is truthy (jq semantics: false and null are falsy)
-    #[inline]
+    #[inline(always)]
     pub fn is_truthy(&self) -> bool {
         !matches!(self, Value::Null | Value::Bool(false))
     }
