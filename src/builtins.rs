@@ -110,6 +110,7 @@ pub const BUILTINS: &[&str] = &[
 ];
 
 /// Check if a name is a builtin function
+#[inline]
 pub fn is_builtin(name: &str) -> bool {
     BUILTINS.contains(&name)
 }

@@ -88,6 +88,7 @@ pub enum Token {
 }
 
 impl Token {
+    #[inline]
     pub fn is_keyword(s: &str) -> Option<Token> {
         match s {
             "null" => Some(Token::Null),

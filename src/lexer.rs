@@ -13,6 +13,7 @@ use nom::{
 };
 
 /// Lex a complete jq program into tokens
+#[inline]
 pub fn lex(input: &str) -> Result<Vec<Token>, String> {
     let (remaining, tokens) = tokens(input).map_err(|e| format!("Lexer error: {:?}", e))?;
     if !remaining.trim().is_empty() {
@@ -112,6 +113,7 @@ fn string_literal(input: &str) -> IResult<&str, Token> {
     Ok((input, Token::String(s)))
 }
 
+#[inline]
 fn number_literal(input: &str) -> IResult<&str, Token> {
     let (input, num) = recognize((
         opt(char('-')),
@@ -127,30 +129,34 @@ fn number_literal(input: &str) -> IResult<&str, Token> {
         opt((one_of("eE"), opt(one_of("+-")), digit1)),
     ))
     .parse(input)?;
-    Ok((input, Token::Number(num.to_string())))
+    Ok((input, Token::Number(num.into())))
 }
 
+#[inline]
 fn variable(input: &str) -> IResult<&str, Token> {
     let (input, _) = char('$').parse(input)?;
     let (input, name) = identifier_str(input)?;
-    Ok((input, Token::Var(name.to_string())))
+    Ok((input, Token::Var(name.into())))
 }
 
+#[inline]
 fn field_access(input: &str) -> IResult<&str, Token> {
     let (input, _) = char('.').parse(input)?;
     let (input, name) = identifier_str(input)?;
-    Ok((input, Token::Field(name.to_string())))
+    Ok((input, Token::Field(name.into())))
 }
 
+#[inline]
 fn identifier(input: &str) -> IResult<&str, Token> {
     let (input, name) = identifier_str(input)?;
     if let Some(kw) = Token::is_keyword(name) {
         Ok((input, kw))
     } else {
-        Ok((input, Token::Ident(name.to_string())))
+        Ok((input, Token::Ident(name.into())))
     }
 }
 
+#[inline]
 fn identifier_str(input: &str) -> IResult<&str, &str> {
     recognize(pair(
         take_while1(|c: char| c.is_alphabetic() || c == '_'),
