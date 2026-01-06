@@ -847,4 +847,439 @@ mod tests {
         assert_eq!(results[0], Value::Number(Number::Int(1)));
         assert_eq!(results[1], Value::Number(Number::Int(2)));
     }
+
+    // =========== Phase 5: Round 2 - 50+ additional tests ===========
+
+    // Edge case tests for numbers
+    #[test]
+    fn test_large_integer() {
+        let results = run(".", "9223372036854775807").unwrap();
+        assert_eq!(results, vec![Value::Number(Number::Int(i64::MAX))]);
+    }
+
+    #[test]
+    fn test_negative_integer() {
+        let results = run(". * -1", "42").unwrap();
+        assert_eq!(results, vec![Value::Number(Number::Int(-42))]);
+    }
+
+    #[test]
+    fn test_float_precision() {
+        let results = run(". + 0.1", "0.2").unwrap();
+        match &results[0] {
+            Value::Number(Number::Float(f)) => assert!((f - 0.3).abs() < 0.0001),
+            _ => panic!("Expected float"),
+        }
+    }
+
+    // More string tests
+    #[test]
+    fn test_empty_string() {
+        let results = run("length", r#""""#).unwrap();
+        assert_eq!(results, vec![Value::Number(Number::Int(0))]);
+    }
+
+    #[test]
+    fn test_unicode_string() {
+        let results = run("length", r#""你好世界""#).unwrap();
+        assert_eq!(results, vec![Value::Number(Number::Int(4))]);
+    }
+
+    #[test]
+    fn test_string_special_chars() {
+        // Test that we can work with strings containing special chars
+        let results = run(r#"split(",")"#, r#""a,b,c""#).unwrap();
+        assert_eq!(results.len(), 1);
+        match &results[0] {
+            Value::Array(arr) => assert_eq!(arr.len(), 3),
+            _ => panic!("Expected array"),
+        }
+    }
+
+    // Array edge cases
+    #[test]
+    fn test_empty_array() {
+        let results = run("length", "[]").unwrap();
+        assert_eq!(results, vec![Value::Number(Number::Int(0))]);
+    }
+
+    #[test]
+    fn test_nested_array() {
+        let results = run(".[][] ", "[[1,2],[3,4]]").unwrap();
+        assert_eq!(results.len(), 4);
+    }
+
+    #[test]
+    fn test_array_index_out_of_bounds() {
+        let results = run(".[100]", "[1,2,3]").unwrap();
+        assert_eq!(results, vec![Value::Null]);
+    }
+
+    #[test]
+    fn test_array_negative_slice() {
+        let results = run(".[-2:]", "[1,2,3,4,5]").unwrap();
+        assert_eq!(results.len(), 1);
+        match &results[0] {
+            Value::Array(arr) => assert_eq!(arr.len(), 2),
+            _ => panic!("Expected array"),
+        }
+    }
+
+    // Object edge cases
+    #[test]
+    fn test_empty_object() {
+        let results = run("keys", "{}").unwrap();
+        assert_eq!(results.len(), 1);
+        match &results[0] {
+            Value::Array(arr) => assert_eq!(arr.len(), 0),
+            _ => panic!("Expected array"),
+        }
+    }
+
+    #[test]
+    fn test_nested_object_access() {
+        let results = run(".a.b.c", r#"{"a":{"b":{"c":42}}}"#).unwrap();
+        assert_eq!(results, vec![Value::Number(Number::Int(42))]);
+    }
+
+    #[test]
+    fn test_object_with_array_value() {
+        let results = run(".items[0]", r#"{"items":[1,2,3]}"#).unwrap();
+        assert_eq!(results, vec![Value::Number(Number::Int(1))]);
+    }
+
+    // Pipe and composition tests
+    #[test]
+    fn test_multiple_pipes() {
+        let results = run(".a | .b | .c", r#"{"a":{"b":{"c":1}}}"#).unwrap();
+        assert_eq!(results, vec![Value::Number(Number::Int(1))]);
+    }
+
+    #[test]
+    fn test_pipe_with_filter() {
+        let results = run(".[] | select(. > 2)", "[1,2,3,4]").unwrap();
+        assert_eq!(results.len(), 2);
+    }
+
+    // Conditional tests
+    #[test]
+    fn test_if_without_else() {
+        let results = run("if . > 0 then . end", "5").unwrap();
+        assert_eq!(results, vec![Value::Number(Number::Int(5))]);
+    }
+
+    #[test]
+    fn test_nested_if() {
+        let results = run("if . > 0 then (if . > 5 then \"big\" else \"small\" end) else \"negative\" end", "3").unwrap();
+        assert_eq!(results, vec![Value::string("small")]);
+    }
+
+    // Error handling tests
+    #[test]
+    fn test_try_with_error() {
+        let results = run("try error catch \"caught\"", "null").unwrap();
+        assert_eq!(results, vec![Value::string("caught")]);
+    }
+
+    #[test]
+    fn test_optional_on_error() {
+        let results = run("(.foo.bar.baz)?", "{}").unwrap();
+        // Optional should not error
+        assert!(results.len() <= 1);
+    }
+
+    // More builtin function tests
+    #[test]
+    fn test_nested_field_access() {
+        let results = run(".a.b", r#"{"a":{"b":1}}"#).unwrap();
+        assert_eq!(results, vec![Value::Number(Number::Int(1))]);
+    }
+
+    #[test]
+    fn test_has_nested() {
+        let results = run(".a | has(\"b\")", r#"{"a":{"b":1}}"#).unwrap();
+        assert_eq!(results, vec![Value::Bool(true)]);
+    }
+
+    #[test]
+    fn test_min_empty() {
+        let results = run("min", "[]").unwrap();
+        assert_eq!(results, vec![Value::Null]);
+    }
+
+    #[test]
+    fn test_max_empty() {
+        let results = run("max", "[]").unwrap();
+        assert_eq!(results, vec![Value::Null]);
+    }
+
+    #[test]
+    fn test_add_empty() {
+        let results = run("add", "[]").unwrap();
+        assert_eq!(results, vec![Value::Null]);
+    }
+
+    #[test]
+    fn test_indices() {
+        let results = run("keys", "[10,20,30]").unwrap();
+        assert_eq!(results.len(), 1);
+        match &results[0] {
+            Value::Array(arr) => {
+                assert_eq!(arr.len(), 3);
+                assert_eq!(arr[0], Value::Number(Number::Int(0)));
+            }
+            _ => panic!("Expected array"),
+        }
+    }
+
+    // Variable and function tests
+    #[test]
+    fn test_variable_binding() {
+        // Test simple variable binding with reduce
+        let results = run("reduce .[] as $x (0; . + $x)", "[1,2,3]").unwrap();
+        assert_eq!(results, vec![Value::Number(Number::Int(6))]);
+    }
+
+    #[test]
+    fn test_function_simple() {
+        // Test simple function without parameters
+        let results = run("def double: . * 2; 5 | double", "null").unwrap();
+        assert_eq!(results, vec![Value::Number(Number::Int(10))]);
+    }
+
+    #[test]
+    fn test_recursive_function() {
+        let results = run("def fact: if . <= 1 then 1 else . * ((. - 1) | fact) end; 5 | fact", "null").unwrap();
+        assert_eq!(results, vec![Value::Number(Number::Int(120))]);
+    }
+
+    // Type checking tests
+    #[test]
+    fn test_isnull() {
+        let results = run("isnull", "null").unwrap();
+        assert_eq!(results, vec![Value::Bool(true)]);
+
+        let results = run("isnull", "1").unwrap();
+        assert_eq!(results, vec![Value::Bool(false)]);
+    }
+
+    #[test]
+    fn test_isstring() {
+        let results = run("isstring", r#""hello""#).unwrap();
+        assert_eq!(results, vec![Value::Bool(true)]);
+    }
+
+    #[test]
+    fn test_isarray() {
+        let results = run("isarray", "[]").unwrap();
+        assert_eq!(results, vec![Value::Bool(true)]);
+    }
+
+    #[test]
+    fn test_isobject() {
+        let results = run("isobject", "{}").unwrap();
+        assert_eq!(results, vec![Value::Bool(true)]);
+    }
+
+    #[test]
+    fn test_isnumber() {
+        let results = run("isnumber", "42").unwrap();
+        assert_eq!(results, vec![Value::Bool(true)]);
+    }
+
+    #[test]
+    fn test_isboolean() {
+        let results = run("isboolean", "true").unwrap();
+        assert_eq!(results, vec![Value::Bool(true)]);
+    }
+
+    // More complex expressions
+    #[test]
+    fn test_object_construction_computed_key() {
+        let results = run(r#"{(.k): .v}"#, r#"{"k":"foo","v":42}"#).unwrap();
+        assert_eq!(results.len(), 1);
+        match &results[0] {
+            Value::Object(obj) => {
+                assert_eq!(obj.get("foo"), Some(&Value::Number(Number::Int(42))));
+            }
+            _ => panic!("Expected object"),
+        }
+    }
+
+    #[test]
+    fn test_array_collect_from_iterator() {
+        let results = run("[.[] | . * 2]", "[1,2,3]").unwrap();
+        assert_eq!(results.len(), 1);
+        match &results[0] {
+            Value::Array(arr) => {
+                assert_eq!(arr.len(), 3);
+                assert_eq!(arr[0], Value::Number(Number::Int(2)));
+            }
+            _ => panic!("Expected array"),
+        }
+    }
+
+    #[test]
+    fn test_with_entries() {
+        // Test to_entries and from_entries roundtrip
+        let results = run("to_entries | from_entries", r#"{"a":1,"b":2}"#).unwrap();
+        assert_eq!(results.len(), 1);
+        match &results[0] {
+            Value::Object(obj) => {
+                assert_eq!(obj.get("a"), Some(&Value::Number(Number::Int(1))));
+                assert_eq!(obj.get("b"), Some(&Value::Number(Number::Int(2))));
+            }
+            _ => panic!("Expected object"),
+        }
+    }
+
+    // Regex edge cases
+    #[test]
+    fn test_test_case_insensitive() {
+        let results = run(r#"test("HELLO"; "i")"#, r#""hello world""#).unwrap();
+        assert_eq!(results, vec![Value::Bool(true)]);
+    }
+
+    #[test]
+    fn test_gsub_global() {
+        let results = run(r#"gsub("a"; "b")"#, r#""banana""#).unwrap();
+        assert_eq!(results, vec![Value::string("bbnbnb")]);
+    }
+
+    #[test]
+    fn test_splits_regex() {
+        let results = run(r#"splits("\\s+")"#, r#""a  b   c""#).unwrap();
+        assert_eq!(results.len(), 3);
+    }
+
+    // Numeric edge cases
+    #[test]
+    fn test_division_result() {
+        let results = run(". / 2", "5").unwrap();
+        match &results[0] {
+            Value::Number(Number::Float(f)) => assert!((f - 2.5).abs() < 0.0001),
+            _ => panic!("Expected float"),
+        }
+    }
+
+    #[test]
+    fn test_integer_modulo() {
+        let results = run(". % 3", "10").unwrap();
+        assert_eq!(results, vec![Value::Number(Number::Int(1))]);
+    }
+
+    // Scalars and iterables
+    #[test]
+    fn test_scalars() {
+        let results = run("scalars", "42").unwrap();
+        assert_eq!(results, vec![Value::Number(Number::Int(42))]);
+
+        let results = run("scalars", "[]").unwrap();
+        assert_eq!(results.len(), 0);
+    }
+
+    #[test]
+    fn test_iterables() {
+        let results = run("iterables", "[]").unwrap();
+        assert_eq!(results.len(), 1);
+
+        let results = run("iterables", "42").unwrap();
+        assert_eq!(results.len(), 0);
+    }
+
+    // Alternative operator
+    #[test]
+    fn test_alternative_with_null() {
+        let results = run("null // 42", "null").unwrap();
+        assert_eq!(results, vec![Value::Number(Number::Int(42))]);
+    }
+
+    #[test]
+    fn test_alternative_with_false() {
+        let results = run("false // 42", "null").unwrap();
+        assert_eq!(results, vec![Value::Number(Number::Int(42))]);
+    }
+
+    #[test]
+    fn test_alternative_chain() {
+        let results = run(".a // .b // .c", r#"{"c":3}"#).unwrap();
+        assert_eq!(results, vec![Value::Number(Number::Int(3))]);
+    }
+
+    // More flatten tests
+    #[test]
+    fn test_flatten_empty() {
+        let results = run("flatten", "[]").unwrap();
+        assert_eq!(results.len(), 1);
+        match &results[0] {
+            Value::Array(arr) => assert_eq!(arr.len(), 0),
+            _ => panic!("Expected array"),
+        }
+    }
+
+    // Debug/env tests (basic)
+    #[test]
+    fn test_now() {
+        let results = run("now", "null").unwrap();
+        assert_eq!(results.len(), 1);
+        match &results[0] {
+            Value::Number(Number::Float(f)) => assert!(*f > 0.0),
+            _ => panic!("Expected float"),
+        }
+    }
+
+    // Update and assignment (if supported)
+    #[test]
+    fn test_object_update() {
+        let results = run(". + {c:3}", r#"{"a":1,"b":2}"#).unwrap();
+        assert_eq!(results.len(), 1);
+        match &results[0] {
+            Value::Object(obj) => assert_eq!(obj.len(), 3),
+            _ => panic!("Expected object"),
+        }
+    }
+
+    // Complex nested operations
+    #[test]
+    fn test_nested_map() {
+        let results = run("map(map(. + 1))", "[[1,2],[3,4]]").unwrap();
+        assert_eq!(results.len(), 1);
+        match &results[0] {
+            Value::Array(outer) => {
+                assert_eq!(outer.len(), 2);
+                match &outer[0] {
+                    Value::Array(inner) => {
+                        assert_eq!(inner[0], Value::Number(Number::Int(2)));
+                    }
+                    _ => panic!("Expected inner array"),
+                }
+            }
+            _ => panic!("Expected array"),
+        }
+    }
+
+    #[test]
+    fn test_reduce_sum() {
+        let results = run("reduce .[] as $x (0; . + $x)", "[1,2,3,4,5]").unwrap();
+        assert_eq!(results, vec![Value::Number(Number::Int(15))]);
+    }
+
+    #[test]
+    fn test_reduce_product() {
+        let results = run("reduce .[] as $x (1; . * $x)", "[1,2,3,4]").unwrap();
+        assert_eq!(results, vec![Value::Number(Number::Int(24))]);
+    }
+
+    // Edge case: empty input handling
+    #[test]
+    fn test_first_empty_array() {
+        let result = run("first", "[]");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_last_empty_array() {
+        let result = run("last", "[]");
+        assert!(result.is_err());
+    }
 }

@@ -179,16 +179,8 @@ impl Value {
     #[inline]
     pub fn values(&self) -> Result<Vec<Value>> {
         match self {
-            Value::Object(obj) => {
-                let mut values = Vec::with_capacity(obj.len());
-                values.extend(obj.values().cloned());
-                Ok(values)
-            }
-            Value::Array(arr) => {
-                let mut values = Vec::with_capacity(arr.len());
-                values.extend(arr.iter().cloned());
-                Ok(values)
-            }
+            Value::Object(obj) => Ok(obj.values().cloned().collect()),
+            Value::Array(arr) => Ok(arr.iter().cloned().collect()),
             _ => Err(JqError::Type(format!("{} has no values", self.type_name()))),
         }
     }
@@ -200,7 +192,7 @@ impl Value {
             (Value::Array(arr), Value::Number(n)) => {
                 let i = n
                     .as_i64()
-                    .ok_or_else(|| JqError::Type("array index must be integer".to_string()))?;
+                    .ok_or_else(|| JqError::Type("array index must be integer".into()))?;
                 let len = arr.len() as i64;
                 let actual_idx = if i < 0 { len + i } else { i };
                 if actual_idx < 0 || actual_idx >= len {
@@ -214,8 +206,8 @@ impl Value {
             }
             (Value::Null, _) => Ok(Value::Null),
             _ => Err(JqError::InvalidIndex {
-                value_type: self.type_name().to_string(),
-                index_type: idx.type_name().to_string(),
+                value_type: self.type_name().into(),
+                index_type: idx.type_name().into(),
             }),
         }
     }
@@ -224,18 +216,10 @@ impl Value {
     #[inline]
     pub fn iter(&self) -> Result<Vec<Value>> {
         match self {
-            Value::Array(arr) => {
-                let mut result = Vec::with_capacity(arr.len());
-                result.extend(arr.iter().cloned());
-                Ok(result)
-            }
-            Value::Object(obj) => {
-                let mut result = Vec::with_capacity(obj.len());
-                result.extend(obj.values().cloned());
-                Ok(result)
-            }
+            Value::Array(arr) => Ok(arr.iter().cloned().collect()),
+            Value::Object(obj) => Ok(obj.values().cloned().collect()),
             Value::Null => Ok(Vec::new()),
-            _ => Err(JqError::NotIterable(self.type_name().to_string())),
+            _ => Err(JqError::NotIterable(self.type_name().into())),
         }
     }
 
