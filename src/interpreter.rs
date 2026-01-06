@@ -437,14 +437,12 @@ fn eval_binop(op: &BinOp, left: &Value, right: &Value) -> Result<Value> {
             ))),
         },
         BinOp::Sub => match (left, right) {
-            (Value::Number(a), Value::Number(b)) => {
-                match (a, b) {
-                    (Number::Int(ai), Number::Int(bi)) => {
-                        Ok(Value::Number(Number::Int(ai.saturating_sub(*bi))))
-                    }
-                    _ => Ok(Value::Number(Number::Float(a.as_f64() - b.as_f64()))),
+            (Value::Number(a), Value::Number(b)) => match (a, b) {
+                (Number::Int(ai), Number::Int(bi)) => {
+                    Ok(Value::Number(Number::Int(ai.saturating_sub(*bi))))
                 }
-            }
+                _ => Ok(Value::Number(Number::Float(a.as_f64() - b.as_f64()))),
+            },
             (Value::Array(a), Value::Array(b)) => {
                 let mut result = Vec::with_capacity(a.len());
                 for x in a.iter() {
@@ -461,14 +459,12 @@ fn eval_binop(op: &BinOp, left: &Value, right: &Value) -> Result<Value> {
             ))),
         },
         BinOp::Mul => match (left, right) {
-            (Value::Number(a), Value::Number(b)) => {
-                match (a, b) {
-                    (Number::Int(ai), Number::Int(bi)) => {
-                        Ok(Value::Number(Number::Int(ai.saturating_mul(*bi))))
-                    }
-                    _ => Ok(Value::Number(Number::Float(a.as_f64() * b.as_f64()))),
+            (Value::Number(a), Value::Number(b)) => match (a, b) {
+                (Number::Int(ai), Number::Int(bi)) => {
+                    Ok(Value::Number(Number::Int(ai.saturating_mul(*bi))))
                 }
-            }
+                _ => Ok(Value::Number(Number::Float(a.as_f64() * b.as_f64()))),
+            },
             (Value::String(s), Value::Number(n)) | (Value::Number(n), Value::String(s)) => {
                 let count = n.as_i64().unwrap_or(0).max(0) as usize;
                 Ok(Value::string(s.repeat(count)))
@@ -964,10 +960,7 @@ fn eval_builtin(name: &str, args: &[Expr], ctx: &Context, input: Value) -> Resul
             for sep in seps {
                 match (&input, &sep) {
                     (Value::String(s), Value::String(sep)) => {
-                        let parts: Vec<Value> = s
-                            .split(sep.as_str())
-                            .map(Value::string)
-                            .collect();
+                        let parts: Vec<Value> = s.split(sep.as_str()).map(Value::string).collect();
                         results.push(Value::array(parts));
                     }
                     _ => return Err(JqError::Type("split requires strings".into())),
@@ -1426,7 +1419,8 @@ fn eval_builtin(name: &str, args: &[Expr], ctx: &Context, input: Value) -> Resul
             match input {
                 Value::Array(arr) => {
                     // Pre-allocate with reasonable capacity
-                    let mut groups: IndexMap<String, Vec<Value>> = IndexMap::with_capacity(arr.len().min(64));
+                    let mut groups: IndexMap<String, Vec<Value>> =
+                        IndexMap::with_capacity(arr.len().min(64));
                     for item in arr.iter() {
                         let keys = eval(&args[0], ctx, item.clone())?;
                         let key = keys.into_iter().next().unwrap_or(Value::Null);
@@ -1761,7 +1755,8 @@ fn build_regex_pattern(pattern: &str, flags: Option<&str>) -> Result<String> {
             if !has_i && !has_m && !has_s && !has_x {
                 return Ok(pattern.into());
             }
-            let prefix_len = (has_i as usize + has_m as usize + has_s as usize + has_x as usize) * 4;
+            let prefix_len =
+                (has_i as usize + has_m as usize + has_s as usize + has_x as usize) * 4;
             let mut result = String::with_capacity(prefix_len + pattern.len());
             if has_i {
                 result.push_str("(?i)");
@@ -1812,10 +1807,7 @@ fn build_match_object(cap: &regex::Captures, _input: &str) -> Value {
                 "offset".into(),
                 Value::Number(Number::Int(m.start() as i64)),
             );
-            capture_obj.insert(
-                "length".into(),
-                Value::Number(Number::Int(m.len() as i64)),
-            );
+            capture_obj.insert("length".into(), Value::Number(Number::Int(m.len() as i64)));
             capture_obj.insert("string".into(), Value::string(m.as_str()));
             capture_obj.insert("name".into(), Value::Null);
         } else {

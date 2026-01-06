@@ -503,8 +503,11 @@ mod tests {
 
     #[test]
     fn test_group_by() {
-        let results =
-            run("group_by(.type)", r#"[{"type":"a"},{"type":"b"},{"type":"a"}]"#).unwrap();
+        let results = run(
+            "group_by(.type)",
+            r#"[{"type":"a"},{"type":"b"},{"type":"a"}]"#,
+        )
+        .unwrap();
         assert_eq!(results.len(), 1);
         match &results[0] {
             Value::Array(arr) => {
@@ -570,7 +573,11 @@ mod tests {
 
     #[test]
     fn test_from_entries() {
-        let results = run("from_entries", r#"[{"key":"a","value":1},{"key":"b","value":2}]"#).unwrap();
+        let results = run(
+            "from_entries",
+            r#"[{"key":"a","value":1},{"key":"b","value":2}]"#,
+        )
+        .unwrap();
         assert_eq!(results.len(), 1);
         match &results[0] {
             Value::Object(obj) => {
@@ -753,7 +760,7 @@ mod tests {
     fn test_recurse() {
         let results = run("recurse(.a?) | .b?", r#"{"a": {"a": {"b": 1}}, "b": 0}"#).unwrap();
         // Should find all .b values in the recursive structure
-        assert!(results.len() >= 1);
+        assert!(!results.is_empty());
     }
 
     #[test]
@@ -970,7 +977,11 @@ mod tests {
 
     #[test]
     fn test_nested_if() {
-        let results = run("if . > 0 then (if . > 5 then \"big\" else \"small\" end) else \"negative\" end", "3").unwrap();
+        let results = run(
+            "if . > 0 then (if . > 5 then \"big\" else \"small\" end) else \"negative\" end",
+            "3",
+        )
+        .unwrap();
         assert_eq!(results, vec![Value::string("small")]);
     }
 
@@ -1049,7 +1060,11 @@ mod tests {
 
     #[test]
     fn test_recursive_function() {
-        let results = run("def fact: if . <= 1 then 1 else . * ((. - 1) | fact) end; 5 | fact", "null").unwrap();
+        let results = run(
+            "def fact: if . <= 1 then 1 else . * ((. - 1) | fact) end; 5 | fact",
+            "null",
+        )
+        .unwrap();
         assert_eq!(results, vec![Value::Number(Number::Int(120))]);
     }
 
