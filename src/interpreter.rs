@@ -61,15 +61,15 @@ impl Context {
 }
 
 /// Evaluate a jq expression
-#[inline]
+#[inline(always)]
 pub fn eval(expr: &Expr, ctx: &Context, input: Value) -> Result<Vec<Value>> {
     match expr {
         Expr::Identity => Ok(vec![input]),
 
         Expr::RecursiveDescent => {
             let mut results = Vec::new();
-            results.push(input.clone());
             collect_recursive(&input, &mut results);
+            results.insert(0, input);
             Ok(results)
         }
 
@@ -212,8 +212,9 @@ pub fn eval(expr: &Expr, ctx: &Context, input: Value) -> Result<Vec<Value>> {
         }
 
         Expr::Comma(left, right) => {
-            let mut results = eval(left, ctx, input.clone())?;
-            results.extend(eval(right, ctx, input)?);
+            let right_results = eval(right, ctx, input.clone())?;
+            let mut results = eval(left, ctx, input)?;
+            results.extend(right_results);
             Ok(results)
         }
 
@@ -274,8 +275,8 @@ pub fn eval(expr: &Expr, ctx: &Context, input: Value) -> Result<Vec<Value>> {
         }
 
         Expr::BinOp(op, left, right) => {
-            let left_vals = eval(left, ctx, input.clone())?;
-            let right_vals = eval(right, ctx, input)?;
+            let right_vals = eval(right, ctx, input.clone())?;
+            let left_vals = eval(left, ctx, input)?;
             let mut results = Vec::with_capacity(left_vals.len() * right_vals.len());
             for l in &left_vals {
                 for r in &right_vals {
@@ -377,7 +378,7 @@ pub fn eval(expr: &Expr, ctx: &Context, input: Value) -> Result<Vec<Value>> {
     }
 }
 
-#[inline]
+#[inline(always)]
 fn collect_recursive(value: &Value, results: &mut Vec<Value>) {
     match value {
         Value::Array(arr) => {
@@ -396,7 +397,7 @@ fn collect_recursive(value: &Value, results: &mut Vec<Value>) {
     }
 }
 
-#[inline]
+#[inline(always)]
 fn eval_binop(op: &BinOp, left: &Value, right: &Value) -> Result<Value> {
     match op {
         BinOp::Add => match (left, right) {
@@ -520,10 +521,10 @@ fn eval_binop(op: &BinOp, left: &Value, right: &Value) -> Result<Value> {
             (Value::Number(a), Value::Number(b)) => {
                 let ai = a
                     .as_i64()
-                    .ok_or_else(|| JqError::Type("Modulo requires integers".to_string()))?;
+                    .ok_or_else(|| JqError::Type("Modulo requires integers".into()))?;
                 let bi = b
                     .as_i64()
-                    .ok_or_else(|| JqError::Type("Modulo requires integers".to_string()))?;
+                    .ok_or_else(|| JqError::Type("Modulo requires integers".into()))?;
                 if bi == 0 {
                     Err(JqError::DivisionByZero)
                 } else {
@@ -572,7 +573,7 @@ fn eval_unaryop(op: &UnaryOp, value: &Value) -> Result<Value> {
 }
 
 /// Evaluate builtin functions
-#[inline]
+#[inline(always)]
 fn eval_builtin(name: &str, args: &[Expr], ctx: &Context, input: Value) -> Result<Vec<Value>> {
     match name {
         // Type functions
@@ -667,7 +668,7 @@ fn eval_builtin(name: &str, args: &[Expr], ctx: &Context, input: Value) -> Resul
                 match &input {
                     Value::Array(arr) if !arr.is_empty() => Ok(vec![arr[0].clone()]),
                     _ => Err(JqError::Type(
-                        "Cannot get first of empty or non-array".to_string(),
+                        "Cannot get first of empty or non-array".into(),
                     )),
                 }
             } else {
@@ -680,7 +681,7 @@ fn eval_builtin(name: &str, args: &[Expr], ctx: &Context, input: Value) -> Resul
                 match &input {
                     Value::Array(arr) if !arr.is_empty() => Ok(vec![arr.last().unwrap().clone()]),
                     _ => Err(JqError::Type(
-                        "Cannot get last of empty or non-array".to_string(),
+                        "Cannot get last of empty or non-array".into(),
                     )),
                 }
             } else {
@@ -843,8 +844,8 @@ fn eval_builtin(name: &str, args: &[Expr], ctx: &Context, input: Value) -> Resul
                 let mut entries = Vec::with_capacity(obj.len());
                 for (k, v) in obj.iter() {
                     let mut entry = IndexMap::with_capacity(2);
-                    entry.insert("key".to_string(), Value::string(k.as_str()));
-                    entry.insert("value".to_string(), v.clone());
+                    entry.insert("key".into(), Value::string(k.as_str()));
+                    entry.insert("value".into(), v.clone());
                     entries.push(Value::object(entry));
                 }
                 Ok(vec![Value::array(entries)])
@@ -1360,12 +1361,14 @@ fn eval_builtin(name: &str, args: &[Expr], ctx: &Context, input: Value) -> Resul
             if args.is_empty() {
                 return Err(JqError::Custom("select requires 1 argument".into()));
             }
+            // Early return optimization - check first result
             let conds = eval(&args[0], ctx, input.clone())?;
-            if conds.iter().any(|v| v.is_truthy()) {
-                Ok(vec![input])
-            } else {
-                Ok(vec![])
+            for v in conds {
+                if v.is_truthy() {
+                    return Ok(vec![input]);
+                }
             }
+            Ok(Vec::new())
         }
         "map" => {
             if args.is_empty() {
@@ -1422,7 +1425,8 @@ fn eval_builtin(name: &str, args: &[Expr], ctx: &Context, input: Value) -> Resul
             }
             match input {
                 Value::Array(arr) => {
-                    let mut groups: IndexMap<String, Vec<Value>> = IndexMap::new();
+                    // Pre-allocate with reasonable capacity
+                    let mut groups: IndexMap<String, Vec<Value>> = IndexMap::with_capacity(arr.len().min(64));
                     for item in arr.iter() {
                         let keys = eval(&args[0], ctx, item.clone())?;
                         let key = keys.into_iter().next().unwrap_or(Value::Null);
@@ -1444,24 +1448,21 @@ fn eval_builtin(name: &str, args: &[Expr], ctx: &Context, input: Value) -> Resul
             }
             match input {
                 Value::Array(arr) => {
-                    let mut arr = (*arr).clone();
-                    // Get sort keys for all items
-                    let mut keyed: Vec<(Value, Value)> = arr
-                        .drain(..)
-                        .map(|item| {
-                            let key = eval(&args[0], ctx, item.clone())
-                                .ok()
-                                .and_then(|v| v.into_iter().next())
-                                .unwrap_or(Value::Null);
-                            (key, item)
-                        })
-                        .collect();
+                    let len = arr.len();
+                    // Get sort keys for all items with pre-allocated capacity
+                    let mut keyed: Vec<(Value, Value)> = Vec::with_capacity(len);
+                    for item in arr.iter() {
+                        let key = eval(&args[0], ctx, item.clone())
+                            .ok()
+                            .and_then(|v| v.into_iter().next())
+                            .unwrap_or(Value::Null);
+                        keyed.push((key, item.clone()));
+                    }
                     keyed.sort_by(|(a, _), (b, _)| {
                         a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal)
                     });
-                    Ok(vec![Value::array(
-                        keyed.into_iter().map(|(_, v)| v).collect(),
-                    )])
+                    let result: Vec<Value> = keyed.into_iter().map(|(_, v)| v).collect();
+                    Ok(vec![Value::array(result)])
                 }
                 _ => Err(JqError::Type(format!(
                     "Cannot sort_by {}",
@@ -1475,8 +1476,10 @@ fn eval_builtin(name: &str, args: &[Expr], ctx: &Context, input: Value) -> Resul
             }
             match input {
                 Value::Array(arr) => {
-                    let mut seen_keys = Vec::new();
-                    let mut result = Vec::new();
+                    // Pre-allocate with reasonable capacity
+                    let cap = arr.len().min(64);
+                    let mut seen_keys = Vec::with_capacity(cap);
+                    let mut result = Vec::with_capacity(cap);
                     for item in arr.iter() {
                         let key = eval(&args[0], ctx, item.clone())
                             .ok()
@@ -1495,17 +1498,26 @@ fn eval_builtin(name: &str, args: &[Expr], ctx: &Context, input: Value) -> Resul
                 ))),
             }
         }
-        "any" => match input {
+        "any" => match &input {
             Value::Array(arr) => {
                 if args.is_empty() {
-                    Ok(vec![Value::Bool(arr.iter().any(|v| v.is_truthy()))])
+                    // Fast path: no filter, just check truthiness
+                    for v in arr.iter() {
+                        if v.is_truthy() {
+                            return Ok(vec![Value::Bool(true)]);
+                        }
+                    }
+                    Ok(vec![Value::Bool(false)])
                 } else {
-                    let result = arr.iter().cloned().any(|item| {
-                        eval(&args[0], ctx, item)
-                            .map(|vals| vals.iter().any(|v| v.is_truthy()))
-                            .unwrap_or(false)
-                    });
-                    Ok(vec![Value::Bool(result)])
+                    // Short-circuit evaluation
+                    for item in arr.iter() {
+                        if let Ok(vals) = eval(&args[0], ctx, item.clone()) {
+                            if vals.iter().any(|v| v.is_truthy()) {
+                                return Ok(vec![Value::Bool(true)]);
+                            }
+                        }
+                    }
+                    Ok(vec![Value::Bool(false)])
                 }
             }
             _ => Err(JqError::Type(format!(
@@ -1513,17 +1525,25 @@ fn eval_builtin(name: &str, args: &[Expr], ctx: &Context, input: Value) -> Resul
                 input.type_name()
             ))),
         },
-        "all" => match input {
+        "all" => match &input {
             Value::Array(arr) => {
                 if args.is_empty() {
-                    Ok(vec![Value::Bool(arr.iter().all(|v| v.is_truthy()))])
+                    // Fast path: no filter, just check truthiness
+                    for v in arr.iter() {
+                        if !v.is_truthy() {
+                            return Ok(vec![Value::Bool(false)]);
+                        }
+                    }
+                    Ok(vec![Value::Bool(true)])
                 } else {
-                    let result = arr.iter().cloned().all(|item| {
-                        eval(&args[0], ctx, item)
-                            .map(|vals| vals.iter().all(|v| v.is_truthy()))
-                            .unwrap_or(false)
-                    });
-                    Ok(vec![Value::Bool(result)])
+                    // Short-circuit evaluation
+                    for item in arr.iter() {
+                        match eval(&args[0], ctx, item.clone()) {
+                            Ok(vals) if vals.iter().all(|v| v.is_truthy()) => continue,
+                            _ => return Ok(vec![Value::Bool(false)]),
+                        }
+                    }
+                    Ok(vec![Value::Bool(true)])
                 }
             }
             _ => Err(JqError::Type(format!(
@@ -1594,7 +1614,15 @@ fn eval_builtin(name: &str, args: &[Expr], ctx: &Context, input: Value) -> Resul
             if step == 0 {
                 return Err(JqError::Custom("range step cannot be 0".into()));
             }
-            let mut results = Vec::new();
+            // Pre-calculate capacity for better performance
+            let capacity = if step > 0 && to > from {
+                ((to - from) / step) as usize
+            } else if step < 0 && from > to {
+                ((from - to) / (-step)) as usize
+            } else {
+                0
+            };
+            let mut results = Vec::with_capacity(capacity.min(10000));
             let mut i = from;
             if step > 0 {
                 while i < to {
@@ -1643,7 +1671,9 @@ fn eval_builtin(name: &str, args: &[Expr], ctx: &Context, input: Value) -> Resul
             } else {
                 args[0].clone()
             };
-            let mut results = vec![input.clone()];
+            // Use capacity hint for common case
+            let mut results = Vec::with_capacity(64);
+            results.push(input.clone());
             let mut stack = vec![input];
             while let Some(current) = stack.pop() {
                 if let Ok(children) = eval(&filter, ctx, current) {
@@ -1704,7 +1734,7 @@ fn eval_builtin(name: &str, args: &[Expr], ctx: &Context, input: Value) -> Resul
     }
 }
 
-#[inline]
+#[inline(always)]
 fn value_contains(haystack: &Value, needle: &Value) -> bool {
     match (haystack, needle) {
         (Value::String(h), Value::String(n)) => h.contains(n.as_str()),
@@ -1719,26 +1749,30 @@ fn value_contains(haystack: &Value, needle: &Value) -> bool {
 }
 
 /// Build a regex pattern with optional flags
-#[inline]
+#[inline(always)]
 fn build_regex_pattern(pattern: &str, flags: Option<&str>) -> Result<String> {
     match flags {
-        None => Ok(pattern.to_string()),
+        None => Ok(pattern.into()),
         Some(f) => {
-            let prefix_len = f.contains('i') as usize * 4
-                + f.contains('m') as usize * 4
-                + f.contains('s') as usize * 4
-                + f.contains('x') as usize * 4;
+            let has_i = f.contains('i');
+            let has_m = f.contains('m');
+            let has_s = f.contains('s');
+            let has_x = f.contains('x');
+            if !has_i && !has_m && !has_s && !has_x {
+                return Ok(pattern.into());
+            }
+            let prefix_len = (has_i as usize + has_m as usize + has_s as usize + has_x as usize) * 4;
             let mut result = String::with_capacity(prefix_len + pattern.len());
-            if f.contains('i') {
+            if has_i {
                 result.push_str("(?i)");
             }
-            if f.contains('m') {
+            if has_m {
                 result.push_str("(?m)");
             }
-            if f.contains('s') {
+            if has_s {
                 result.push_str("(?s)");
             }
-            if f.contains('x') {
+            if has_x {
                 result.push_str("(?x)");
             }
             result.push_str(pattern);
@@ -1755,18 +1789,18 @@ fn build_match_object(cap: &regex::Captures, _input: &str) -> Value {
 
     // offset - byte offset of the match
     obj.insert(
-        "offset".to_string(),
+        "offset".into(),
         Value::Number(Number::Int(full_match.start() as i64)),
     );
     // length - length of the match
     obj.insert(
-        "length".to_string(),
+        "length".into(),
         Value::Number(Number::Int(full_match.len() as i64)),
     );
     // string - the matched string
-    obj.insert("string".to_string(), Value::string(full_match.as_str()));
+    obj.insert("string".into(), Value::string(full_match.as_str()));
     // name - the capture group name (null for unnamed)
-    obj.insert("name".to_string(), Value::Null);
+    obj.insert("name".into(), Value::Null);
 
     // captures - array of capture groups
     let cap_count = cap.len().saturating_sub(1);
@@ -1775,24 +1809,24 @@ fn build_match_object(cap: &regex::Captures, _input: &str) -> Value {
         let mut capture_obj = IndexMap::with_capacity(4);
         if let Some(m) = m {
             capture_obj.insert(
-                "offset".to_string(),
+                "offset".into(),
                 Value::Number(Number::Int(m.start() as i64)),
             );
             capture_obj.insert(
-                "length".to_string(),
+                "length".into(),
                 Value::Number(Number::Int(m.len() as i64)),
             );
-            capture_obj.insert("string".to_string(), Value::string(m.as_str()));
-            capture_obj.insert("name".to_string(), Value::Null);
+            capture_obj.insert("string".into(), Value::string(m.as_str()));
+            capture_obj.insert("name".into(), Value::Null);
         } else {
-            capture_obj.insert("offset".to_string(), Value::Number(Number::Int(-1)));
-            capture_obj.insert("length".to_string(), Value::Number(Number::Int(0)));
-            capture_obj.insert("string".to_string(), Value::Null);
-            capture_obj.insert("name".to_string(), Value::Null);
+            capture_obj.insert("offset".into(), Value::Number(Number::Int(-1)));
+            capture_obj.insert("length".into(), Value::Number(Number::Int(0)));
+            capture_obj.insert("string".into(), Value::Null);
+            capture_obj.insert("name".into(), Value::Null);
         }
         captures.push(Value::object(capture_obj));
     }
-    obj.insert("captures".to_string(), Value::array(captures));
+    obj.insert("captures".into(), Value::array(captures));
 
     Value::object(obj)
 }
@@ -1800,11 +1834,11 @@ fn build_match_object(cap: &regex::Captures, _input: &str) -> Value {
 /// Convert jq replacement syntax to regex replacement syntax
 /// jq uses \(.name) for named groups and \(0), \(1) for numbered groups
 /// Rust regex uses $name and $1, $2 etc.
-#[inline]
+#[inline(always)]
 fn convert_jq_replacement(replacement: &str) -> String {
     // Fast path: if no backslash, return as-is
     if !replacement.contains('\\') {
-        return replacement.to_string();
+        return replacement.into();
     }
     let mut result = String::with_capacity(replacement.len());
     let chars: Vec<char> = replacement.chars().collect();
