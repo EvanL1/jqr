@@ -21,17 +21,20 @@ struct Parser {
 }
 
 impl Parser {
+    #[inline]
     fn new(tokens: Vec<Token>) -> Self {
         Self { tokens, pos: 0 }
     }
 
+    #[inline]
     fn peek(&self) -> Option<&Token> {
         self.tokens.get(self.pos)
     }
 
+    #[inline]
     fn advance(&mut self) -> Option<Token> {
         if self.pos < self.tokens.len() {
-            let token = self.tokens[self.pos].clone();
+            let token = std::mem::replace(&mut self.tokens[self.pos], Token::Dot);
             self.pos += 1;
             Some(token)
         } else {
@@ -39,10 +42,11 @@ impl Parser {
         }
     }
 
+    #[inline]
     fn expect(&mut self, expected: &Token) -> Result<()> {
         match self.peek() {
             Some(t) if t == expected => {
-                self.advance();
+                self.pos += 1;
                 Ok(())
             }
             Some(t) => Err(JqError::Parse(format!(
@@ -57,11 +61,13 @@ impl Parser {
     }
 
     /// Parse a complete expression
+    #[inline]
     fn parse_expr(&mut self) -> Result<Expr> {
         self.parse_pipe()
     }
 
     /// Parse pipe expressions: expr | expr
+    #[inline]
     fn parse_pipe(&mut self) -> Result<Expr> {
         let mut left = self.parse_comma()?;
         while matches!(self.peek(), Some(Token::Pipe)) {
@@ -73,6 +79,7 @@ impl Parser {
     }
 
     /// Parse comma expressions: expr, expr
+    #[inline]
     fn parse_comma(&mut self) -> Result<Expr> {
         let mut left = self.parse_alternative()?;
         while matches!(self.peek(), Some(Token::Comma)) {
@@ -84,6 +91,7 @@ impl Parser {
     }
 
     /// Parse alternative: expr // expr
+    #[inline]
     fn parse_alternative(&mut self) -> Result<Expr> {
         let mut left = self.parse_or()?;
         while matches!(self.peek(), Some(Token::Alt)) {
@@ -193,6 +201,7 @@ impl Parser {
     }
 
     /// Parse postfix: expr?, expr[], expr.field
+    #[inline]
     fn parse_postfix(&mut self) -> Result<Expr> {
         let mut expr = self.parse_primary()?;
         loop {
